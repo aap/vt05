@@ -324,7 +324,7 @@ shell(void)
 	pw = getpwuid(getuid());
 	if(pw == NULL)
 		panic("No user");
-	execl(pw->pw_shell, pw->pw_shell, NULL);
+//	execl(pw->pw_shell, pw->pw_shell, NULL);
 
 	exit(1);
 }
