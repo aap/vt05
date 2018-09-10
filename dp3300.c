@@ -26,8 +26,10 @@ typedef uint32_t u32;
 
 SDL_Surface *screen;
 
-/* pixel fmt: ARGB */
-u32 fg = 0xFFFFFFFF;
+/* pixel fmt: RGBA */
+//u32 fg = 0x94FF00FF;
+u32 fg = 0x00FF00FF;
+//u32 fg = 0xFFD300FF;	// amber
 u32 bg = 0x000000FF;
 
 #include "dpchars.h"
@@ -374,7 +376,10 @@ shell(void)
 //	execl("/home/aap/bin/supdup", "supdup", "its.pdp10.se", nil);
 //	execl("/bin/telnet", "telnet", "its.svensson.org", nil);
 //	execl("/bin/telnet", "telnet", "maya", "10000", nil);
-	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
+//	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
+//	execl("/bin/telnet", "telnet", "its.pdp10.se", "10000", nil);
+	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
+//	execl("/bin/cat", "cat", nil);
 
 	exit(1);
 }
