@@ -53,7 +53,8 @@ u32 *finalfb;
 int curx, cury;
 int baud = 330;
 u32 userevent;
-int updated = 1;
+int updatebuf = 1;
+int updatescreen = 1;
 
 int pty;
 
@@ -101,6 +102,10 @@ updatefb(void)
 	int i;
 	int x, y;
 
+	/* do this early so recvchar update works right */
+	updatebuf = 0;
+	updatescreen = 1;
+
 	p = finalfb;
 
 	for(y = 0; y < FBHEIGHT; y++)
@@ -117,17 +122,22 @@ updatefb(void)
 	/* TODO: blink */
 	for(i = 0; i < CWIDTH; i++)
 		putpixel(p, x+i, y, fg);
+
+	SDL_UpdateTexture(screentex, nil, finalfb, WIDTH*sizeof(u32));
 }
 
 void
 draw(void)
 {
-	updatefb();
-	SDL_UpdateTexture(screentex, nil, finalfb, WIDTH*sizeof(u32));
-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, screentex, nil, nil);
-	SDL_RenderPresent(renderer);
+	if(updatebuf)
+		updatefb();
+	if(updatescreen){
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, screentex, nil, nil);
+		SDL_RenderPresent(renderer);
+		updatescreen = 0;
+	}
 }
 
 void
@@ -178,7 +188,8 @@ recvchar(int c)
 	case 030:	/* CAN */
 		curx++;
 		break;
-	case 010:	/* is this correct? */
+	case 010:
+		/* is this correct?, also delete character perhaps? */
 	case 031:	/* EM */
 		curx--;
 		break;
@@ -217,7 +228,7 @@ recvchar(int c)
 	if(cury >= TERMHEIGHT)
 		cury = TERMHEIGHT-1;
 
-	updated = 1;
+	updatebuf = 1;
 }
 
 /* Map SDL scancodes to ASCII */
@@ -238,7 +249,7 @@ int scancodemap[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_DELETE] = 0177,
 
 	[SDL_SCANCODE_ESCAPE] = 033,
-	[SDL_SCANCODE_TAB] = 033,	/* Or map this to tap */
+	[SDL_SCANCODE_TAB] = 033,	/* Or map this to tab */
 	[SDL_SCANCODE_Q] = 'Q',
 	[SDL_SCANCODE_W] = 'W',
 	[SDL_SCANCODE_E] = 'E',
@@ -294,6 +305,12 @@ keydown(SDL_Keysym keysym)
 	case SDL_SCANCODE_RCTRL: ctrl = 1; return;
 	}
 
+	if(keysym.scancode == SDL_SCANCODE_F1){
+		updatebuf = 1;
+		updatescreen = 1;
+		draw();
+	}
+
 	key = scancodemap[keysym.scancode];
 	if(key == 0)
 		return;
@@ -305,7 +322,6 @@ keydown(SDL_Keysym keysym)
 
 	char c = key;
 	write(pty, &c, 1);
-//	recvchar(key);
 }
 
 void
@@ -338,10 +354,12 @@ readthread(void *p)
 //		slp.tv_nsec = 1000*1000*1000 / (baud/11);
 //		nanosleep(&slp, NULL);
 
-//		SDL_PushEvent(&ev);
+//printf("push userevent\n");
+		SDL_PushEvent(&ev);
 	}
 }
 
+#if 0
 void*
 timethread(void *arg)
 {
@@ -355,6 +373,7 @@ timethread(void *arg)
 		SDL_PushEvent(&ev);
 	}
 }
+#endif
 
 void
 sigchld(int s)
@@ -377,9 +396,9 @@ shell(void)
 //	execl("/bin/telnet", "telnet", "its.svensson.org", nil);
 //	execl("/bin/telnet", "telnet", "maya", "10000", nil);
 //	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
-//	execl("/bin/telnet", "telnet", "its.pdp10.se", "10000", nil);
-	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
-//	execl("/bin/cat", "cat", nil);
+///	execl("/bin/telnet", "telnet", "its.pdp10.se", "10003", nil);
+//	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
+	execl("/bin/cat", "cat", nil);
 
 	exit(1);
 }
@@ -456,6 +475,7 @@ main(int argc, char *argv[])
 	}
 
 
+	SDL_Init(SDL_INIT_EVERYTHING);
 	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
 		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 
@@ -470,7 +490,7 @@ main(int argc, char *argv[])
 			fb[y][x] = ' ';
 
 	pthread_create(&thr1, NULL, readthread, NULL);
-	pthread_create(&thr2, nil, timethread, nil);
+//	pthread_create(&thr2, nil, timethread, nil);
 
 	while(SDL_WaitEvent(&ev) >= 0){
 		switch(ev.type){
@@ -484,13 +504,26 @@ main(int argc, char *argv[])
 			keyup(ev.key.keysym);
 			break;
 
-		default:
 		case SDL_USEREVENT:
-			if(updated){
+			/* got a new character */
+			draw();
+			break;
 		case SDL_WINDOWEVENT:
-				updated = 0;
+			switch(ev.window.event){
+			case SDL_WINDOWEVENT_MOVED:
+			case SDL_WINDOWEVENT_ENTER:
+			case SDL_WINDOWEVENT_LEAVE:
+			case SDL_WINDOWEVENT_FOCUS_GAINED:
+			case SDL_WINDOWEVENT_FOCUS_LOST:
+			case SDL_WINDOWEVENT_TAKE_FOCUS:
+				break;
+			default:
+				/* redraw */
+				updatescreen = 1;
 				draw();
+				break;
 			}
+			break;
 		}
 	}
 out:
