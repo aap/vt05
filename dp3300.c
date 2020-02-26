@@ -22,6 +22,7 @@
 #include "args.h"
 
 typedef uint32_t u32;
+typedef uint8_t u8;
 #define nil NULL
 
 SDL_Surface *screen;
@@ -42,16 +43,17 @@ u32 bg = 0x000000FF;
 #define FBWIDTH (TERMWIDTH*(CWIDTH+2)+2*2)
 #define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
 
-//int sclx = 2;
-//int scly = 3;
-int sclx = 1;
-int scly = 1;
+int sclx = 3;
+int scly = 3;
+//int sclx = 1;
+//int scly = 1;
 
 #define WIDTH  (sclx*FBWIDTH)
 #define HEIGHT (scly*FBHEIGHT)
 
 SDL_Renderer *renderer;
 SDL_Texture *screentex;
+u8 *keystate;
 char fb[TERMHEIGHT][TERMWIDTH];
 u32 *finalfb;
 int curx, cury;
@@ -309,6 +311,9 @@ keydown(SDL_Keysym keysym)
 	case SDL_SCANCODE_LCTRL:
 	case SDL_SCANCODE_RCTRL: ctrl = 1; return;
 	}
+	if(keystate[SDL_SCANCODE_LGUI] || keystate[SDL_SCANCODE_RGUI])
+		return;
+
 
 	if(keysym.scancode == SDL_SCANCODE_F1){
 		updatebuf = 1;
@@ -487,6 +492,8 @@ main(int argc, char *argv[])
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
 	finalfb = malloc(WIDTH*HEIGHT*sizeof(u32));
+
+	keystate = SDL_GetKeyboardState(nil);
 
 	userevent = SDL_RegisterEvents(1);
 
