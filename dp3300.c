@@ -37,11 +37,15 @@ u32 bg = 0x000000FF;
 #define TERMWIDTH 72
 #define TERMHEIGHT 25
 
-#define FBWIDTH (TERMWIDTH*(CWIDTH+2)+2*2)
-#define FBHEIGHT (TERMHEIGHT*(CHEIGHT+2)+2*2)
+#define VSPACE 5
 
-int sclx = 2;
-int scly = 3;
+#define FBWIDTH (TERMWIDTH*(CWIDTH+2)+2*2)
+#define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
+
+//int sclx = 2;
+//int scly = 3;
+int sclx = 1;
+int scly = 1;
 
 #define WIDTH  (sclx*FBWIDTH)
 #define HEIGHT (scly*FBHEIGHT)
@@ -85,7 +89,7 @@ drawchar(u32 *p, int x, int y, char *c)
 {
 	int i, j;
 	x = 2 + x*(CWIDTH+2);
-	y = 2 + y*(CHEIGHT+2);
+	y = 2 + y*(CHEIGHT+VSPACE);
 	assert(x >= 0);
 	assert(x < FBWIDTH);
 	assert(y >= 0);
@@ -102,10 +106,6 @@ updatefb(void)
 	int i;
 	int x, y;
 
-	/* do this early so recvchar update works right */
-	updatebuf = 0;
-	updatescreen = 1;
-
 	p = finalfb;
 
 	for(y = 0; y < FBHEIGHT; y++)
@@ -117,26 +117,28 @@ updatefb(void)
 			drawchar(p, x, y, font[fb[y][x]]);
 
 	x = 2 + curx*(CWIDTH+2);
-	y = 2 + cury*(CHEIGHT+2) + CHEIGHT;
+	y = 2 + cury*(CHEIGHT+VSPACE) + CHEIGHT;
 
 	/* TODO: blink */
 	for(i = 0; i < CWIDTH; i++)
 		putpixel(p, x+i, y, fg);
-
-	SDL_UpdateTexture(screentex, nil, finalfb, WIDTH*sizeof(u32));
 }
 
 void
 draw(void)
 {
-	if(updatebuf)
+	if(updatebuf){
+		updatebuf = 0;
 		updatefb();
+		SDL_UpdateTexture(screentex, nil, finalfb, WIDTH*sizeof(u32));
+		updatescreen = 1;
+	}
 	if(updatescreen){
+		updatescreen = 0;
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, screentex, nil, nil);
 		SDL_RenderPresent(renderer);
-		updatescreen = 0;
 	}
 }
 
@@ -174,6 +176,7 @@ recvchar(int c)
 			curx = curx+8 & ~7;
 		break;
 	case 012:	/* LF */
+	LF:
 		cury++;
 		if(cury >= TERMHEIGHT)
 			scroll();
@@ -182,26 +185,26 @@ recvchar(int c)
 		curx = 0;
 		break;
 
-	case 013:	/* VT */
+	case 013:	/* VT  - ^K */
 		cury++;
 		break;
-	case 030:	/* CAN */
+	case 030:	/* CAN - ^X */
 		curx++;
 		break;
-	case 010:
+	case 010:	/* BS - ^H */
 		/* is this correct?, also delete character perhaps? */
-	case 031:	/* EM */
+	case 031:	/* EM - ^Y */
 		curx--;
 		break;
-	case 032:	/* SUB */
+	case 032:	/* SUB - ^Z */
 		cury--;
 		break;
 
-	case 034:	/* FS, HOME DOWN */
+	case 034:	/* FS, HOME DOWN - S-^L */
 		curx = 0;
 		cury = 24;
 		break;
-	case 035:	/* GS, HOME UP */
+	case 035:	/* GS, HOME UP - S-^M */
 		curx = 0;
 		cury = 0;
 		break;
@@ -221,8 +224,10 @@ recvchar(int c)
 
 	if(curx < 0)
 		curx = 0;
-	if(curx >= TERMWIDTH)
-		curx = TERMWIDTH-1;
+	if(curx >= TERMWIDTH){
+		curx = 0;
+		goto LF;
+	}
 	if(cury < 0)
 		cury = 0;
 	if(cury >= TERMHEIGHT)
@@ -354,7 +359,6 @@ readthread(void *p)
 //		slp.tv_nsec = 1000*1000*1000 / (baud/11);
 //		nanosleep(&slp, NULL);
 
-//printf("push userevent\n");
 		SDL_PushEvent(&ev);
 	}
 }
@@ -394,11 +398,12 @@ shell(void)
 //	execl(pw->pw_shell, pw->pw_shell, nil);
 //	execl("/home/aap/bin/supdup", "supdup", "its.pdp10.se", nil);
 //	execl("/bin/telnet", "telnet", "its.svensson.org", nil);
-//	execl("/bin/telnet", "telnet", "maya", "10000", nil);
+///	execl("/bin/telnet", "telnet", "maya", "10003", nil);
 //	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
 ///	execl("/bin/telnet", "telnet", "its.pdp10.se", "10003", nil);
 //	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
-	execl("/bin/cat", "cat", nil);
+//	execl("/bin/cat", "cat", nil);
+	execl("/bin/telnet", "telnet", "its.pdp10.se", "1972", nil);
 
 	exit(1);
 }
@@ -490,7 +495,6 @@ main(int argc, char *argv[])
 			fb[y][x] = ' ';
 
 	pthread_create(&thr1, NULL, readthread, NULL);
-//	pthread_create(&thr2, nil, timethread, nil);
 
 	while(SDL_WaitEvent(&ev) >= 0){
 		switch(ev.type){

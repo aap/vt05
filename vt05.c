@@ -1,14 +1,3 @@
-/*
- * This is a very simple VT05 emulator without a lot of features.
- *
- * F1 toggles between full and reduced ASCII input.
- * -b sets a baudrate to simulate.
- * -x/-y scale the framebuffer.
- *
- * BUGS: - too fast input confuses it somehow.
- *       - keyboard layout is handled in an ugly way.
- */
-
 #define _XOPEN_SOURCE 600
 #define _DEFAULT_SOURCE
 
@@ -28,16 +17,20 @@
 #include <errno.h>
 #include <pthread.h>
 #include <SDL.h>
+#include <assert.h>
 
 #include "args.h"
 
 typedef uint32_t u32;
+#define nil NULL
 
 SDL_Surface *screen;
 
-/* pixel fmt: ARGB */
-u32 fg = 0xFFFFFFFF;
-u32 bg = 0xFF000000;
+/* pixel fmt: RGBA */
+//u32 fg = 0x94FF00FF;
+u32 fg = 0x00FF00FF;
+//u32 fg = 0xFFD300FF;	// amber
+u32 bg = 0x000000FF;
 
 #include "vt05chars.h"
 
@@ -53,11 +46,15 @@ int scly = 3;
 #define WIDTH  (sclx*FBWIDTH)
 #define HEIGHT (scly*FBHEIGHT)
 
+SDL_Renderer *renderer;
+SDL_Texture *screentex;
 char fb[TERMHEIGHT][TERMWIDTH];
+u32 *finalfb;
 int curx, cury;
-int cad, cady;
-int fullascii = 1;
 int baud = 330;
+u32 userevent;
+int updatebuf = 1;
+int updatescreen = 1;
 
 int pty;
 
@@ -89,20 +86,27 @@ drawchar(u32 *p, int x, int y, char *c)
 	int i, j;
 	x = 2 + x*(CWIDTH+2);
 	y = 2 + y*(CHEIGHT+2);
+	assert(x >= 0);
+	assert(x < FBWIDTH);
+	assert(y >= 0);
+	assert(y < FBHEIGHT);
 	for(j = 0; j < CHEIGHT; j++)
 		for(i = 0; i < CWIDTH; i++)
 			putpixel(p, x+i, y+j, c[j*CWIDTH+i] == '*' ? fg : bg);
 }
 
 void
-draw(void)
+updatefb(void)
 {
 	u32 *p;
 	int i;
 	int x, y;
 
-	SDL_LockSurface(screen);
-	p = screen->pixels;
+	/* do this early so recvchar update works right */
+	updatebuf = 0;
+	updatescreen = 1;
+
+	p = finalfb;
 
 	for(y = 0; y < FBHEIGHT; y++)
 		for(x = 0; x < FBWIDTH; x++)
@@ -119,7 +123,21 @@ draw(void)
 	for(i = 0; i < CWIDTH; i++)
 		putpixel(p, x+i, y, fg);
 
-	SDL_UnlockSurface(screen);
+	SDL_UpdateTexture(screentex, nil, finalfb, WIDTH*sizeof(u32));
+}
+
+void
+draw(void)
+{
+	if(updatebuf)
+		updatefb();
+	if(updatescreen){
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, screentex, nil, nil);
+		SDL_RenderPresent(renderer);
+		updatescreen = 0;
+	}
 }
 
 void
@@ -133,7 +151,8 @@ scroll(void)
 		fb[TERMHEIGHT-1][x] = ' ';
 }
 
-/* Fold down the upper codepoints */
+int cad, cady;
+
 char
 mapchar(char c)
 {
@@ -144,7 +163,7 @@ mapchar(char c)
 }
 
 void
-recvchar(char c)
+recvchar(int c)
 {
 	char pc;
 	int x, y;
@@ -237,53 +256,121 @@ recvchar(char c)
 		cury = 0;
 	if(cury >= TERMHEIGHT)
 		cury = TERMHEIGHT-1;
+
+	updatebuf = 1;
+}
+
+/* Map SDL scancodes to ASCII */
+// Can't map VT05 keyboard sensible....this is from Datapoint 3300
+int scancodemap[SDL_NUM_SCANCODES] = {
+	[SDL_SCANCODE_1] = '1',
+	[SDL_SCANCODE_2] = '2',
+	[SDL_SCANCODE_3] = '3',
+	[SDL_SCANCODE_4] = '4',
+	[SDL_SCANCODE_5] = '5',
+	[SDL_SCANCODE_6] = '6',
+	[SDL_SCANCODE_7] = '7',
+	[SDL_SCANCODE_8] = '8',
+	[SDL_SCANCODE_9] = '9',
+	[SDL_SCANCODE_0] = '0',
+	[SDL_SCANCODE_MINUS] = ':',
+	[SDL_SCANCODE_EQUALS] = '-',
+	[SDL_SCANCODE_BACKSPACE] = 010,
+	[SDL_SCANCODE_DELETE] = 0177,
+
+	[SDL_SCANCODE_ESCAPE] = 033,
+	[SDL_SCANCODE_TAB] = 033,	/* Or map this to tab */
+	[SDL_SCANCODE_Q] = 'Q',
+	[SDL_SCANCODE_W] = 'W',
+	[SDL_SCANCODE_E] = 'E',
+	[SDL_SCANCODE_R] = 'R',
+	[SDL_SCANCODE_T] = 'T',
+	[SDL_SCANCODE_Y] = 'Y',
+	[SDL_SCANCODE_U] = 'U',
+	[SDL_SCANCODE_I] = 'I',
+	[SDL_SCANCODE_O] = 'O',
+	[SDL_SCANCODE_P] = 'P',
+	[SDL_SCANCODE_LEFTBRACKET] = 012,
+	[SDL_SCANCODE_RIGHTBRACKET] = 015,
+
+	[SDL_SCANCODE_A] = 'A',
+	[SDL_SCANCODE_S] = 'S',
+	[SDL_SCANCODE_D] = 'D',
+	[SDL_SCANCODE_F] = 'F',
+	[SDL_SCANCODE_G] = 'G',
+	[SDL_SCANCODE_H] = 'H',
+	[SDL_SCANCODE_J] = 'J',
+	[SDL_SCANCODE_K] = 'K',
+	[SDL_SCANCODE_L] = 'L',
+	[SDL_SCANCODE_SEMICOLON] = ';',
+	[SDL_SCANCODE_APOSTROPHE] = 0177,
+	[SDL_SCANCODE_RETURN] = 015,
+
+	[SDL_SCANCODE_Z] = 'Z',
+	[SDL_SCANCODE_X] = 'X',
+	[SDL_SCANCODE_C] = 'C',
+	[SDL_SCANCODE_V] = 'V',
+	[SDL_SCANCODE_B] = 'B',
+	[SDL_SCANCODE_N] = 'N',
+	[SDL_SCANCODE_M] = 'M',
+	[SDL_SCANCODE_COMMA] = ',',
+	[SDL_SCANCODE_PERIOD] = '.',
+	[SDL_SCANCODE_SLASH] = '/',
+	[SDL_SCANCODE_SPACE] = ' ',
+};
+
+int ctrl;
+int shift;
+
+void
+keydown(SDL_Keysym keysym)
+{
+	int key;
+
+	switch(keysym.scancode){
+	case SDL_SCANCODE_LSHIFT:
+	case SDL_SCANCODE_RSHIFT: shift = 1; return;
+	case SDL_SCANCODE_CAPSLOCK:
+	case SDL_SCANCODE_LCTRL:
+	case SDL_SCANCODE_RCTRL: ctrl = 1; return;
+	}
+
+	if(keysym.scancode == SDL_SCANCODE_F1){
+		updatebuf = 1;
+		updatescreen = 1;
+		draw();
+	}
+
+	key = scancodemap[keysym.scancode];
+	if(key == 0)
+		return;
+	if(shift)
+		key ^= 020;
+	if(ctrl)
+		key &= 037;
+//	printf("%o(%d %d) %c\n", key, shift, ctrl, key);
+
+	char c = key;
+//	write(pty, &c, 1);
+
+
+SDL_Event ev;
+SDL_memset(&ev, 0, sizeof(SDL_Event));
+ev.type = userevent;
+recvchar(c);
+SDL_PushEvent(&ev);
 }
 
 void
-sendchar(char c, int mod)
+keyup(SDL_Keysym keysym)
 {
-	int x, y;
-
-	/* SHIFT */
-	if(mod & 1){
-		/* The VT05 has an ascii-aware keyboard layout, so we
-		 * can't use its shifting logic as is. Do some shifting
-		 * manually and clear the shift flag as a workaround.
-		 * Very ugly as it only works with US qwerty right now. */
-		switch(c){
-		case ';': c = ':'; break;
-		case '`': c = '~'; break;
-		case '2': c = '@'; break;
-		case '6': c = '^'; break;
-		case '7': c = '&'; break;
-		case '8': c = '*'; break;
-		case '9': c = '('; break;
-		case '0': c = ')'; break;
-		case '-': c = '_'; break;
-		case '=': c = '+'; break;
-		case '\'': c = '"'; break;
-		default:
-			goto noshift;
-		}
-		mod &= ~1;
+	switch(keysym.scancode){
+	case SDL_SCANCODE_LSHIFT:
+	case SDL_SCANCODE_RSHIFT: shift = 0; return;
+	case SDL_SCANCODE_CAPSLOCK:
+	case SDL_SCANCODE_LCTRL:
+	case SDL_SCANCODE_RCTRL: ctrl = 0; return;
 	}
-noshift:
-	/* This is the real VT05 shifting logic */
-	if(mod & 1 && c >= 040){
-		if(c & 0100)
-			c ^= 040;
-		else
-			c ^= 020;
-	}
-
-	/* CTRL */
-	if(mod & 2)
-		c &= ~0140;
-
-	if(!fullascii && c != 0177)
-		c = mapchar(c);
-
-	write(pty, &c, 1);
 }
 
 void*
@@ -294,19 +381,36 @@ readthread(void *p)
 	static struct timespec slp;
 
 	SDL_memset(&ev, 0, sizeof(SDL_Event));
-	ev.type = SDL_USEREVENT;
+	ev.type = userevent;
 
 	while(1){
 		read(pty, &c, 1);
-		ev.user.code = c;
+		recvchar(c);
 
 		/* simulate baudrate, TODO: get from tty */
-		slp.tv_nsec = 1000*1000*1000 / (baud/11);
-		nanosleep(&slp, NULL);
+//		slp.tv_nsec = 1000*1000*1000 / (baud/11);
+//		nanosleep(&slp, NULL);
 
+//printf("push userevent\n");
 		SDL_PushEvent(&ev);
 	}
 }
+
+#if 0
+void*
+timethread(void *arg)
+{
+	(void)arg;
+	SDL_Event ev;
+	memset(&ev, 0, sizeof(ev));
+	ev.type = userevent;
+	struct timespec slp = { 0, 30*1000*1000 };
+	for(;;){
+		nanosleep(&slp, nil);
+		SDL_PushEvent(&ev);
+	}
+}
+#endif
 
 void
 sigchld(int s)
@@ -324,10 +428,18 @@ shell(void)
 	pw = getpwuid(getuid());
 	if(pw == NULL)
 		panic("No user");
-	execl(pw->pw_shell, pw->pw_shell, NULL);
+//	execl(pw->pw_shell, pw->pw_shell, nil);
+//	execl("/home/aap/bin/supdup", "supdup", "its.pdp10.se", nil);
+//	execl("/bin/telnet", "telnet", "its.svensson.org", nil);
+//	execl("/bin/telnet", "telnet", "maya", "10000", nil);
+//	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
+///	execl("/bin/telnet", "telnet", "its.pdp10.se", "10003", nil);
+//	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
+	execl("/bin/cat", "cat", nil);
 
 	exit(1);
 }
+
 
 char *argv0;
 
@@ -340,11 +452,11 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
+	SDL_Window *window;
 	SDL_Event ev;
-	SDLKey k;
 	int mod;
 	int x, y;
-	pthread_t thr;
+	pthread_t thr1, thr2;
 	struct winsize ws;
 
 	ARGBEGIN{
@@ -399,95 +511,57 @@ main(int argc, char *argv[])
 		signal(SIGCHLD, sigchld);
 	}
 
-	if(SDL_Init(SDL_INIT_VIDEO) < 0){
-	error:
-		fprintf(stderr, "Error: %s\n", SDL_GetError());
-		return 1;
-	}
 
-	screen = SDL_SetVideoMode(WIDTH, HEIGHT, 32, SDL_DOUBLEBUF);
-	if(screen == NULL)
-		goto error;
+	SDL_Init(SDL_INIT_EVERYTHING);
+	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
+		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 
-	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY,
-		SDL_DEFAULT_REPEAT_INTERVAL);
+	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+			SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
+	finalfb = malloc(WIDTH*HEIGHT*sizeof(u32));
 
-	pthread_create(&thr, NULL, readthread, NULL);
+	userevent = SDL_RegisterEvents(1);
 
 	for(x = 0; x < TERMWIDTH; x++)
 		for(y = 0; y < TERMHEIGHT; y++)
 			fb[y][x] = ' ';
+
+	pthread_create(&thr1, NULL, readthread, NULL);
+//	pthread_create(&thr2, nil, timethread, nil);
 
 	while(SDL_WaitEvent(&ev) >= 0){
 		switch(ev.type){
 		case SDL_QUIT:
 			goto out;
 
-		case SDL_USEREVENT:
-			recvchar(ev.user.code);
-			break;
-
-		case SDL_KEYUP:
-			k = ev.key.keysym.sym;
-			switch(k){
-			case SDLK_RSHIFT:
-			case SDLK_LSHIFT:
-				mod &= ~1;
-				break;
-
-			case SDLK_RCTRL:
-			case SDLK_LCTRL:
-				mod &= ~2;
-				break;
-			}
-
-			break;
 		case SDL_KEYDOWN:
-			k = ev.key.keysym.sym;
-			if(k >= 040 && k < 0200)
-				sendchar(k, mod);
-			else switch(k){
-			case SDLK_F1:
-				fullascii = !fullascii;
-				break;
+			keydown(ev.key.keysym);
+			break;
+		case SDL_KEYUP:
+			keyup(ev.key.keysym);
+			break;
 
-			case '\b':
-			case '\t':
-			case '\r':
-			case '\n':
-				sendchar(k, mod);
+		case SDL_USEREVENT:
+			/* got a new character */
+			draw();
+			break;
+		case SDL_WINDOWEVENT:
+			switch(ev.window.event){
+			case SDL_WINDOWEVENT_MOVED:
+			case SDL_WINDOWEVENT_ENTER:
+			case SDL_WINDOWEVENT_LEAVE:
+			case SDL_WINDOWEVENT_FOCUS_GAINED:
+			case SDL_WINDOWEVENT_FOCUS_LOST:
+			case SDL_WINDOWEVENT_TAKE_FOCUS:
 				break;
-
-			case SDLK_UP:
-				sendchar(032, mod);
-				break;
-			case SDLK_DOWN:
-				sendchar('\v', mod);
-				break;
-			case SDLK_LEFT:
-				sendchar('\b', mod);
-				break;
-			case SDLK_RIGHT:
-				sendchar(030, mod);
-				break;
-
-			case SDLK_HOME:
-				sendchar(035, mod);
-				break;
-
-			case SDLK_RSHIFT:
-			case SDLK_LSHIFT:
-				mod |= 1;
-				break;
-
-			case SDLK_RCTRL:
-			case SDLK_LCTRL:
-				mod |= 2;
+			default:
+				/* redraw */
+				updatescreen = 1;
+				draw();
 				break;
 			}
+			break;
 		}
-		draw();
-		SDL_Flip(screen);
 	}
 out:
 	SDL_Quit();
