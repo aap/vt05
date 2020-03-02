@@ -567,6 +567,8 @@ sigchld(int s)
 	exit(0);
 }
 
+char **cmd;
+
 void
 shell(void)
 {
@@ -574,19 +576,8 @@ shell(void)
 
 	setenv("TERM", "dumb", 1);
 
-	pw = getpwuid(getuid());
-	if(pw == NULL)
-		panic("No user");
-//	execl(pw->pw_shell, pw->pw_shell, nil);
-//	execl("/home/aap/bin/supdup", "supdup", "its.pdp10.se", nil);
-//	execl("/bin/telnet", "telnet", "its.svensson.org", nil);
-//	execl("/bin/telnet", "telnet", "maya", "10003", nil);
-//	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
-//	execl("/bin/telnet", "telnet", "its.pdp10.se", "10003", nil);
-//	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
-	execl("/bin/cat", "cat", nil);
-//	execl("/bin/sh", "sh", nil);
-//	execl("/bin/telnet", "telnet", "its.pdp10.se", "1972", nil);
+	//execl("/usr/bin/telnet", "telnet", "localhost", "10002", nil);
+	execv("/usr/bin/telnet", cmd);
 
 	exit(1);
 }
@@ -615,6 +606,8 @@ main(int argc, char *argv[])
 		baud = atoi(EARGF(usage()));
 		break;
 	}ARGEND;
+
+	cmd = &argv[0];
 
 	pty = posix_openpt(O_RDWR);
 	if(pty < 0 ||
@@ -699,7 +692,10 @@ main(int argc, char *argv[])
 			case SDL_WINDOWEVENT_LEAVE:
 			case SDL_WINDOWEVENT_FOCUS_GAINED:
 			case SDL_WINDOWEVENT_FOCUS_LOST:
+#if (SDL_MAJOR_VERSION > 2) || (SDL_MAJOR_VERSION == 2 && \
+    (SDL_MINOR_VERSION > 0) || (SDL_PATCHLEVEL > 4))
 			case SDL_WINDOWEVENT_TAKE_FOCUS:
+#endif
 				break;
 			default:
 				/* redraw */
