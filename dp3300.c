@@ -29,9 +29,16 @@ SDL_Surface *screen;
 
 /* pixel fmt: RGBA */
 //u32 fg = 0x94FF00FF;
-u32 fg = 0x00FF00FF;
-//u32 fg = 0xFFD300FF;	// amber
+//u32 fg = 0x00FF00FF;	// green
+//u32 fg = 0xFFFFFFFF;
+u32 fg = 0xFFD300FF;	// amber
 u32 bg = 0x000000FF;
+
+typedef struct Col Col;
+struct Col
+{
+	u8 a, b, g, r;
+};
 
 #include "dpchars.h"
 
@@ -55,12 +62,14 @@ SDL_Renderer *renderer;
 SDL_Texture *screentex;
 u8 *keystate;
 char fb[TERMHEIGHT][TERMWIDTH];
-u32 *finalfb;
 int curx, cury;
 int baud = 330;
 u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
+int blink;
+
+SDL_Texture *fonttex[65];
 
 int pty;
 
@@ -75,166 +84,161 @@ panic(char *fmt, ...)
 	exit(1);
 }
 
+#define BLURRADIUS 4
+#define MATSIZ (2*BLURRADIUS+1)
+
+float blurmat[MATSIZ][MATSIZ];
+
 void
-putpixel(u32 *p, int x, int y, u32 col)
+initblur(float sig)
 {
 	int i, j;
-	x *= sclx;
-	y *= scly;
-	for(i = 0; i < sclx; i++)
-		for(j = 0; j < scly; j++)
-			p[(y+j)*WIDTH + x+i] = col;
+	float dx, dy, dist;
+
+	for(i = 0; i < MATSIZ; i++)
+		for(j = 0; j < MATSIZ; j++){
+			dx = i-BLURRADIUS;
+			dy = j-BLURRADIUS;
+			dist = sqrt(dx*dx + dy*dy);
+			blurmat[i][j] = exp(-(dx*dx + dy*dy)/(2*sig*sig)) / (2*M_PI*sig*sig);
+		}
 }
 
-void
-putpixel_(u32 *p, int x, int y, u32 col)
+float Gamma = 1.0/2.2f;
+
+Col
+getblur(Col *src, int width, int height, int x, int y)
 {
-	p[y*WIDTH + x] = col;
+	int xx, yy;
+	Col *p;
+	int i, j;
+	int r, g, b, a;
+	Col c;
+
+	r = g = b = a = 0;
+	for(i = 0, yy = y-BLURRADIUS; yy <= y+BLURRADIUS; yy++, i++){
+		if(yy < 0 || yy >= height)
+			continue;
+		for(j = 0, xx = x-BLURRADIUS; xx <= x+BLURRADIUS; xx++, j++){
+			if(xx < 0 || xx >= width)
+				continue;
+			p = &src[yy*width + xx];
+			r += p->r * blurmat[i][j];
+			g += p->g * blurmat[i][j];
+			b += p->b * blurmat[i][j];
+			a += p->a * blurmat[i][j];
+		}
+	}
+	c.r = pow(r/255.0f, Gamma)*255;
+	c.g = pow(g/255.0f, Gamma)*255;
+	c.b = pow(b/255.0f, Gamma)*255;
+	c.a = pow(a/255.0f, Gamma)*255;
+
+	p = &src[y*width + x];
+	if(p->r > c.r) c.r = p->r;
+	if(p->g > c.g) c.g = p->g;
+	if(p->b > c.b) c.b = p->b;
+	if(p->a > c.a) c.a = p->a;
+
+	return c;
 }
 
-u32 cols[4] = {
-	0x2e2a25FF,	// bg
-	0xae843eFF,	// leading edge
-	0x9f7940FF,	// trailing edge
-	0xebaf29FF	// full intensity
-};
-
-u32 bgs[2] = {
-	0x2e2a25FF,
-	0x211f1bFF
-};
+#define TEXW ((CWIDTH*2 + BLURRADIUS*2))
+#define TEXH ((CHEIGHT*2 + BLURRADIUS*2))
 
 void
-drawchar_(u32 *p, int x, int y, char *c)
+createchar(u32 *raster, int c)
 {
 	int i, j;
-	x = 2 + x*(CWIDTH+2);
-	y = 2 + y*(CHEIGHT+VSPACE);
-	assert(x >= 0);
-	assert(x < FBWIDTH);
-	assert(y >= 0);
-	assert(y < FBHEIGHT);
-	for(j = 0; j < CHEIGHT; j++)
-		for(i = 0; i < CWIDTH; i++)
-			putpixel(p, x+i, y+j, c[j*CWIDTH+i] == '*' ? fg : bg);
-}
+	char *chr = font[c + ' '];
 
-void
-drawchar(u32 *p, int x, int y, char *c)
-{
-	int i, j;
-	x = 2 + x*(CWIDTH);
-	y = 2 + y*(CHEIGHT+VSPACE);
-	assert(x >= 0);
-	assert(x < FBWIDTH);
-	assert(y >= 0);
-	assert(y < FBHEIGHT);
+	memset(raster, 0, TEXW*TEXH*sizeof(u32));
+	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
 
-	x *= sclx;
-	y *= scly;
-
-	int bits[CWIDTH+1];
-
-	int this;
-	int last;
-	u32 col;
-	int xx;
-	for(j = 0; j < CHEIGHT; j++){
-		last = 0;
-		memset(bits, 0, sizeof(bits));
-		for(i = 0; i < CWIDTH; i++){
-			if(c[j*CWIDTH+i] == '*'){
-				bits[i] = 1;
-				bits[i+1] = 1;
+	for(i = 0; i < CHEIGHT; i++){
+		for(j = 0; j < CWIDTH; j++){
+			if(chr[i*CWIDTH+j] == '*'){
+				raster[(i*2+0)*TEXW + j*2] = fg;
+				raster[(i*2+0)*TEXW + j*2+1] = fg;
+			// uncomment to disable scanlines
+			//	raster[(i*2+1)*TEXW + j*2] = fg;
+			//	raster[(i*2+1)*TEXW + j*2+1] = fg;
 			}
 		}
-
-		xx = x;
-		for(i = 0; i < CWIDTH+1; i++){
-			this = bits[i];
-			col = cols[last<<1 | this];
-			putpixel_(p, xx, y, col);
-			xx++;
-			last = this;
-		}
-		this = 0;
-		col = cols[last<<1 | this];
-		putpixel_(p, xx, y, col);
-		y += 2;
 	}
 }
 
 void
-updatefb(void)
+blurchar(u32 *dst, u32 *src)
 {
-	u32 *p;
-	int i;
+	Col *s, *d, c;
 	int x, y;
 
-	p = finalfb;
-
-	for(y = 0; y < FBHEIGHT; y++)
-		for(x = 0; x < FBWIDTH; x++)
-			putpixel(p, x, y, bg);
-
-	for(x = 0; x < TERMWIDTH; x++)
-		for(y = 0; y < TERMHEIGHT; y++)
-			drawchar_(p, x, y, font[fb[y][x]]);
-
-	x = 2 + curx*(CWIDTH+2);
-	y = 2 + cury*(CHEIGHT+VSPACE) + CHEIGHT;
-
-	/* TODO: blink */
-	for(i = 0; i < CWIDTH; i++)
-		putpixel(p, x+i, y, fg);
+	s = (Col*)src;
+	d = (Col*)dst;
+	for(y = 0; y < TEXH; y++){
+		for(x = 0; x < TEXW; x++){
+			c = getblur(s, TEXW, TEXH, x, y);
+			c.a = 255;
+			d[y*TEXW + x] = c;
+		}
+	}
 }
 
 void
-updatefb_(void)
+createfont(void)
 {
-	u32 *p;
-	int i;
-	int x, y;
+	int i, j;
+	int w, h;
+	u32 *ras1, *ras2;
+	w = TEXW;
+	h = TEXH;
+	ras1 = malloc(w*h*sizeof(u32));
+	ras2 = malloc(w*h*sizeof(u32));
+	for(i = 0; i < 65; i++){
+		createchar(ras1, i);
+		blurchar(ras2, ras1);
 
-	p = finalfb;
 
-/*
-	for(y = 0; y < FBHEIGHT; y++)
-		for(x = 0; x < FBWIDTH; x++)
-//			putpixel(p, x, y, bg);
-			putpixel(p, x, y, bgs[y&1]);
-*/
-	for(y = 0; y < HEIGHT; y++)
-		for(x = 0; x < WIDTH; x++)
-			putpixel_(p, x, y, bgs[y&1]);
-
-	for(x = 0; x < TERMWIDTH; x++)
-		for(y = 0; y < TERMHEIGHT; y++)
-			drawchar(p, x, y, font[fb[y][x]]);
-
-//	x = 2 + curx*(CWIDTH+2);
-	x = 2 + curx*(CWIDTH);
-	y = 2 + cury*(CHEIGHT+VSPACE) + CHEIGHT;
-
-	/* TODO: blink */
-	for(i = 0; i < CWIDTH; i++)
-//		putpixel(p, x+i, y, fg);
-		putpixel(p, x+i, y, cols[3]);
+		fonttex[i] = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+			SDL_TEXTUREACCESS_STREAMING, w, h);
+		SDL_SetTextureBlendMode(fonttex[i], SDL_BLENDMODE_ADD);
+		SDL_UpdateTexture(fonttex[i], nil, ras2, w*sizeof(u32));
+	}
 }
 
 void
 draw(void)
 {
+	int x, y, c;
+	SDL_Rect r;
+	r.x = 0;
+	r.y = 0;
+	r.w = TEXW;
+	r.h = TEXH;
+
 	if(updatebuf){
 		updatebuf = 0;
-		updatefb();
-		SDL_UpdateTexture(screentex, nil, finalfb, WIDTH*sizeof(u32));
+
+		SDL_SetRenderTarget(renderer, screentex);
+		SDL_SetRenderDrawColor(renderer, 21, 13, 6, 0);
+		SDL_RenderClear(renderer);
+		for(x = 0; x < TERMWIDTH; x++)
+			for(y = 0; y < TERMHEIGHT; y++){
+				c = fb[y][x];
+				if(blink && x == curx && y == cury)
+					c = '_'+1;
+				if(c >= ' '){
+					r.x = (2 + x*(CWIDTH+2))*2 - BLURRADIUS;
+					r.y = (2 + y*(CHEIGHT+VSPACE))*2 - BLURRADIUS;
+					SDL_RenderCopy(renderer, fonttex[c-' '], nil, &r);
+				}
+			}
+		SDL_SetRenderTarget(renderer, nil);
 		updatescreen = 1;
 	}
 	if(updatescreen){
 		updatescreen = 0;
-		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, screentex, nil, nil);
 		SDL_RenderPresent(renderer);
 	}
@@ -268,10 +272,12 @@ recvchar(int c)
 		break;
 	case 011:	/* HT */
 		/* TODO: stolen from VT05, is it the same? */
+/*
 		if(curx >= 64)
 			curx++;
 		else
 			curx = curx+8 & ~7;
+*/
 		break;
 	case 012:	/* LF */
 	LF:
@@ -534,7 +540,6 @@ readthread(void *p)
 	}
 }
 
-#if 0
 void*
 timethread(void *arg)
 {
@@ -542,13 +547,14 @@ timethread(void *arg)
 	SDL_Event ev;
 	memset(&ev, 0, sizeof(ev));
 	ev.type = userevent;
-	struct timespec slp = { 0, 30*1000*1000 };
+	struct timespec slp = { 0, 1000*1000*1000/3.75f };
 	for(;;){
+		blink = !blink;
+		updatebuf = 1;
 		nanosleep(&slp, nil);
 		SDL_PushEvent(&ev);
 	}
 }
-#endif
 
 void
 sigchld(int s)
@@ -569,11 +575,11 @@ shell(void)
 //	execl(pw->pw_shell, pw->pw_shell, nil);
 //	execl("/home/aap/bin/supdup", "supdup", "its.pdp10.se", nil);
 //	execl("/bin/telnet", "telnet", "its.svensson.org", nil);
-	execl("/bin/telnet", "telnet", "maya", "10003", nil);
+//	execl("/bin/telnet", "telnet", "maya", "10003", nil);
 //	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
 //	execl("/bin/telnet", "telnet", "its.pdp10.se", "10003", nil);
 //	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
-//	execl("/bin/cat", "cat", nil);
+	execl("/bin/cat", "cat", nil);
 //	execl("/bin/telnet", "telnet", "its.pdp10.se", "1972", nil);
 
 	exit(1);
@@ -655,9 +661,10 @@ main(int argc, char *argv[])
 	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
 		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-			SDL_TEXTUREACCESS_STREAMING, WIDTH, HEIGHT);
-	finalfb = malloc(WIDTH*HEIGHT*sizeof(u32));
+			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
 
 	keystate = SDL_GetKeyboardState(nil);
 
@@ -666,8 +673,11 @@ main(int argc, char *argv[])
 	for(x = 0; x < TERMWIDTH; x++)
 		for(y = 0; y < TERMHEIGHT; y++)
 			fb[y][x] = ' ';
+	initblur(1.5);
+	createfont();
 
 	pthread_create(&thr1, NULL, readthread, NULL);
+	pthread_create(&thr2, NULL, timethread, NULL);
 
 	while(SDL_WaitEvent(&ev) >= 0){
 		switch(ev.type){
