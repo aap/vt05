@@ -43,8 +43,8 @@ u32 bg = 0x000000FF;
 #define FBWIDTH (TERMWIDTH*(CWIDTH+2)+2*2)
 #define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
 
-int sclx = 3;
-int scly = 3;
+int sclx = 2;
+int scly = 2;
 //int sclx = 1;
 //int scly = 1;
 
@@ -87,7 +87,25 @@ putpixel(u32 *p, int x, int y, u32 col)
 }
 
 void
-drawchar(u32 *p, int x, int y, char *c)
+putpixel_(u32 *p, int x, int y, u32 col)
+{
+	p[y*WIDTH + x] = col;
+}
+
+u32 cols[4] = {
+	0x2e2a25FF,	// bg
+	0xae843eFF,	// leading edge
+	0x9f7940FF,	// trailing edge
+	0xebaf29FF	// full intensity
+};
+
+u32 bgs[2] = {
+	0x2e2a25FF,
+	0x211f1bFF
+};
+
+void
+drawchar_(u32 *p, int x, int y, char *c)
 {
 	int i, j;
 	x = 2 + x*(CWIDTH+2);
@@ -99,6 +117,51 @@ drawchar(u32 *p, int x, int y, char *c)
 	for(j = 0; j < CHEIGHT; j++)
 		for(i = 0; i < CWIDTH; i++)
 			putpixel(p, x+i, y+j, c[j*CWIDTH+i] == '*' ? fg : bg);
+}
+
+void
+drawchar(u32 *p, int x, int y, char *c)
+{
+	int i, j;
+	x = 2 + x*(CWIDTH);
+	y = 2 + y*(CHEIGHT+VSPACE);
+	assert(x >= 0);
+	assert(x < FBWIDTH);
+	assert(y >= 0);
+	assert(y < FBHEIGHT);
+
+	x *= sclx;
+	y *= scly;
+
+	int bits[CWIDTH+1];
+
+	int this;
+	int last;
+	u32 col;
+	int xx;
+	for(j = 0; j < CHEIGHT; j++){
+		last = 0;
+		memset(bits, 0, sizeof(bits));
+		for(i = 0; i < CWIDTH; i++){
+			if(c[j*CWIDTH+i] == '*'){
+				bits[i] = 1;
+				bits[i+1] = 1;
+			}
+		}
+
+		xx = x;
+		for(i = 0; i < CWIDTH+1; i++){
+			this = bits[i];
+			col = cols[last<<1 | this];
+			putpixel_(p, xx, y, col);
+			xx++;
+			last = this;
+		}
+		this = 0;
+		col = cols[last<<1 | this];
+		putpixel_(p, xx, y, col);
+		y += 2;
+	}
 }
 
 void
@@ -116,7 +179,7 @@ updatefb(void)
 
 	for(x = 0; x < TERMWIDTH; x++)
 		for(y = 0; y < TERMHEIGHT; y++)
-			drawchar(p, x, y, font[fb[y][x]]);
+			drawchar_(p, x, y, font[fb[y][x]]);
 
 	x = 2 + curx*(CWIDTH+2);
 	y = 2 + cury*(CHEIGHT+VSPACE) + CHEIGHT;
@@ -124,6 +187,39 @@ updatefb(void)
 	/* TODO: blink */
 	for(i = 0; i < CWIDTH; i++)
 		putpixel(p, x+i, y, fg);
+}
+
+void
+updatefb_(void)
+{
+	u32 *p;
+	int i;
+	int x, y;
+
+	p = finalfb;
+
+/*
+	for(y = 0; y < FBHEIGHT; y++)
+		for(x = 0; x < FBWIDTH; x++)
+//			putpixel(p, x, y, bg);
+			putpixel(p, x, y, bgs[y&1]);
+*/
+	for(y = 0; y < HEIGHT; y++)
+		for(x = 0; x < WIDTH; x++)
+			putpixel_(p, x, y, bgs[y&1]);
+
+	for(x = 0; x < TERMWIDTH; x++)
+		for(y = 0; y < TERMHEIGHT; y++)
+			drawchar(p, x, y, font[fb[y][x]]);
+
+//	x = 2 + curx*(CWIDTH+2);
+	x = 2 + curx*(CWIDTH);
+	y = 2 + cury*(CHEIGHT+VSPACE) + CHEIGHT;
+
+	/* TODO: blink */
+	for(i = 0; i < CWIDTH; i++)
+//		putpixel(p, x+i, y, fg);
+		putpixel(p, x+i, y, cols[3]);
 }
 
 void
@@ -239,7 +335,8 @@ recvchar(int c)
 }
 
 /* Map SDL scancodes to ASCII */
-int scancodemap[SDL_NUM_SCANCODES] = {
+
+int scancodemap_orig[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_1] = '1',
 	[SDL_SCANCODE_2] = '2',
 	[SDL_SCANCODE_3] = '3',
@@ -296,12 +393,73 @@ int scancodemap[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_SPACE] = ' ',
 };
 
+char *scancodemap[SDL_NUM_SCANCODES] = {
+	[SDL_SCANCODE_ESCAPE] = "\033\033",
+
+	[SDL_SCANCODE_GRAVE] = "\033\033",
+	[SDL_SCANCODE_1] = "1!",
+	[SDL_SCANCODE_2] = "2@",
+	[SDL_SCANCODE_3] = "3#",
+	[SDL_SCANCODE_4] = "4$",
+	[SDL_SCANCODE_5] = "5%",
+	[SDL_SCANCODE_6] = "6^",
+	[SDL_SCANCODE_7] = "7&",
+	[SDL_SCANCODE_8] = "8*",
+	[SDL_SCANCODE_9] = "9(",
+	[SDL_SCANCODE_0] = "0)",
+	[SDL_SCANCODE_MINUS] = "-_",
+	[SDL_SCANCODE_EQUALS] = "=+",
+	[SDL_SCANCODE_BACKSPACE] = "\b\b",
+	[SDL_SCANCODE_DELETE] = "\177\177",
+
+	[SDL_SCANCODE_TAB] = "\011\011",
+	[SDL_SCANCODE_Q] = "QQ",
+	[SDL_SCANCODE_W] = "WW",
+	[SDL_SCANCODE_E] = "EE",
+	[SDL_SCANCODE_R] = "RR",
+	[SDL_SCANCODE_T] = "TT",
+	[SDL_SCANCODE_Y] = "YY",
+	[SDL_SCANCODE_U] = "UU",
+	[SDL_SCANCODE_I] = "II",
+	[SDL_SCANCODE_O] = "OO",
+	[SDL_SCANCODE_P] = "PP",
+	[SDL_SCANCODE_LEFTBRACKET] = "[[",
+	[SDL_SCANCODE_RIGHTBRACKET] = "]]",
+	[SDL_SCANCODE_BACKSLASH] = "\\\\",
+
+	[SDL_SCANCODE_A] = "AA",
+	[SDL_SCANCODE_S] = "SS",
+	[SDL_SCANCODE_D] = "DD",
+	[SDL_SCANCODE_F] = "FF",
+	[SDL_SCANCODE_G] = "GG",
+	[SDL_SCANCODE_H] = "HH",
+	[SDL_SCANCODE_J] = "JJ",
+	[SDL_SCANCODE_K] = "KK",
+	[SDL_SCANCODE_L] = "LL",
+	[SDL_SCANCODE_SEMICOLON] = ";:",
+	[SDL_SCANCODE_APOSTROPHE] = "'\"",
+	[SDL_SCANCODE_RETURN] = "\015\015",
+
+	[SDL_SCANCODE_Z] = "ZZ",
+	[SDL_SCANCODE_X] = "XX",
+	[SDL_SCANCODE_C] = "CC",
+	[SDL_SCANCODE_V] = "VV",
+	[SDL_SCANCODE_B] = "BB",
+	[SDL_SCANCODE_N] = "NN",
+	[SDL_SCANCODE_M] = "MM",
+	[SDL_SCANCODE_COMMA] = ",<",
+	[SDL_SCANCODE_PERIOD] = ".>",
+	[SDL_SCANCODE_SLASH] = "/?",
+	[SDL_SCANCODE_SPACE] = "  ",
+};
+
 int ctrl;
 int shift;
 
 void
 keydown(SDL_Keysym keysym)
 {
+	char *keys;
 	int key;
 
 	switch(keysym.scancode){
@@ -321,11 +479,19 @@ keydown(SDL_Keysym keysym)
 		draw();
 	}
 
-	key = scancodemap[keysym.scancode];
+/*
+	key = scancodemap_orig[keysym.scancode];
 	if(key == 0)
 		return;
 	if(shift)
 		key ^= 020;
+	if(ctrl)
+		key &= 037;
+*/
+	keys = scancodemap[keysym.scancode];
+	if(keys == nil)
+		return;
+	key = keys[shift];
 	if(ctrl)
 		key &= 037;
 //	printf("%o(%d %d) %c\n", key, shift, ctrl, key);
@@ -403,12 +569,12 @@ shell(void)
 //	execl(pw->pw_shell, pw->pw_shell, nil);
 //	execl("/home/aap/bin/supdup", "supdup", "its.pdp10.se", nil);
 //	execl("/bin/telnet", "telnet", "its.svensson.org", nil);
-///	execl("/bin/telnet", "telnet", "maya", "10003", nil);
+	execl("/bin/telnet", "telnet", "maya", "10003", nil);
 //	execl("/bin/telnet", "telnet", "localhost", "10000", nil);
-///	execl("/bin/telnet", "telnet", "its.pdp10.se", "10003", nil);
+//	execl("/bin/telnet", "telnet", "its.pdp10.se", "10003", nil);
 //	execl("/bin/ssh", "ssh", "its@tty.livingcomputers.org", nil);
 //	execl("/bin/cat", "cat", nil);
-	execl("/bin/telnet", "telnet", "its.pdp10.se", "1972", nil);
+//	execl("/bin/telnet", "telnet", "its.pdp10.se", "1972", nil);
 
 	exit(1);
 }
