@@ -704,7 +704,10 @@ main(int argc, char *argv[])
 			case SDL_WINDOWEVENT_LEAVE:
 			case SDL_WINDOWEVENT_FOCUS_GAINED:
 			case SDL_WINDOWEVENT_FOCUS_LOST:
+#if (SDL_MAJOR_VERSION > 2) || (SDL_MAJOR_VERSION == 2 && \
+    (SDL_MINOR_VERSION > 0) || (SDL_PATCHLEVEL > 4))
 			case SDL_WINDOWEVENT_TAKE_FOCUS:
+#endif
 				break;
 			default:
 				/* redraw */
