@@ -18,6 +18,7 @@
 #include <pthread.h>
 #include <SDL.h>
 #include <assert.h>
+#include <math.h>
 
 #include "args.h"
 
