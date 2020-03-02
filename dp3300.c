@@ -30,8 +30,9 @@ SDL_Surface *screen;
 /* pixel fmt: RGBA */
 //u32 fg = 0x94FF00FF;
 //u32 fg = 0x00FF00FF;	// green
+u32 fg = 0x0CCC68FF;	// green
 //u32 fg = 0xFFFFFFFF;
-u32 fg = 0xFFD300FF;	// amber
+//u32 fg = 0xFFD300FF;	// amber
 u32 bg = 0x000000FF;
 
 typedef struct Col Col;
