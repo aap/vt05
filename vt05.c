@@ -47,7 +47,7 @@ struct Col
 #define TERMHEIGHT 20
 
 #define HSPACE 2
-#define VSPACE 5
+#define VSPACE 7
 
 #define FBWIDTH (TERMWIDTH*(CWIDTH+HSPACE)+2*2)
 #define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
