@@ -572,8 +572,6 @@ char **cmd;
 void
 shell(void)
 {
-	struct passwd *pw;
-
 	setenv("TERM", "dumb", 1);
 
 	//execl("/usr/bin/telnet", "telnet", "localhost", "10002", nil);

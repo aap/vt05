@@ -47,18 +47,14 @@ struct Col
 #define TERMWIDTH 72
 #define TERMHEIGHT 25
 
+#define HSPACE 2
 #define VSPACE 5
 
-#define FBWIDTH (TERMWIDTH*(CWIDTH+2)+2*2)
+#define FBWIDTH (TERMWIDTH*(CWIDTH+HSPACE)+2*2)
 #define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
 
-int sclx = 2;
-int scly = 2;
-//int sclx = 1;
-//int scly = 1;
-
-#define WIDTH  (sclx*FBWIDTH)
-#define HEIGHT (scly*FBHEIGHT)
+#define WIDTH  (2*FBWIDTH)
+#define HEIGHT (2*FBHEIGHT)
 
 SDL_Renderer *renderer;
 SDL_Texture *screentex;
@@ -231,7 +227,7 @@ draw(void)
 				if(blink && x == curx && y == cury)
 					c = '_'+1;
 				if(c >= ' '){
-					r.x = (2 + x*(CWIDTH+2))*2 - BLURRADIUS;
+					r.x = (2 + x*(CWIDTH+HSPACE))*2 - BLURRADIUS;
 					r.y = (2 + y*(CHEIGHT+VSPACE))*2 - BLURRADIUS;
 					SDL_RenderCopy(renderer, fonttex[c-' '], nil, &r);
 				}
@@ -600,15 +596,6 @@ main(int argc, char *argv[])
 	case 'b':
 		baud = atoi(EARGF(usage()));
 		break;
-
-	case 'x':
-		sclx = atoi(EARGF(usage()));
-		break;
-
-	case 'y':
-		scly = atoi(EARGF(usage()));
-		break;
-
 	}ARGEND;
 
 	cmd = &argv[0];
