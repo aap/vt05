@@ -534,7 +534,8 @@ readthread(void *p)
 	ev.type = userevent;
 
 	while(1){
-		read(pty, &c, 1);
+		if(read(pty, &c, 1) < 0)
+			exit(0);
 		recvchar(c);
 
 		/* simulate baudrate, TODO: get from tty */
@@ -559,12 +560,6 @@ timethread(void *arg)
 		nanosleep(&slp, nil);
 		SDL_PushEvent(&ev);
 	}
-}
-
-void
-sigchld(int s)
-{
-	exit(0);
 }
 
 char **cmd;
@@ -638,14 +633,13 @@ main(int argc, char *argv[])
 		dup(0);
 		dup(1);
 
-		shell();
 
-	default:
-		signal(SIGCHLD, sigchld);
+		shell();
 	}
 
 
 	SDL_Init(SDL_INIT_EVERYTHING);
+
 	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
 		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 

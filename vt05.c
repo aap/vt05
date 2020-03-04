@@ -558,7 +558,8 @@ readthread(void *p)
 	ev.type = userevent;
 
 	while(1){
-		read(pty, &c, 1);
+		if(read(pty, &c, 1) < 0)
+			exit(0);
 		recvchar(c);
 
 		/* simulate baudrate, TODO: get from tty */
@@ -585,12 +586,6 @@ timethread(void *arg)
 	}
 }
 #endif
-
-void
-sigchld(int s)
-{
-	exit(0);
-}
 
 char **cmd;
 
@@ -665,9 +660,6 @@ main(int argc, char *argv[])
 		dup(1);
 
 		shell();
-
-	default:
-		signal(SIGCHLD, sigchld);
 	}
 
 
