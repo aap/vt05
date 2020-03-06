@@ -56,7 +56,7 @@ struct Col
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Texture *screentex;
-u8 *keystate;
+const u8 *keystate;
 char fb[TERMHEIGHT][TERMWIDTH];
 int curx, cury;
 int baud = 330;
