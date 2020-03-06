@@ -414,6 +414,10 @@ main(int argc, char *argv[])
 	case 'b':
 		baud = atoi(EARGF(usage()));
 		break;
+	case 'B':
+		/* Backspace is Rubout. */
+		scancodemap[SDL_SCANCODE_BACKSPACE] = "\177\177";
+		break;
 	}ARGEND;
 
 	cmd = &argv[0];
