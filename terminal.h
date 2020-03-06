@@ -14,7 +14,7 @@ void recvchar(int c);
 extern char **scancodemap;
 extern char *scancodemap_both[];
 extern char *scancodemap_upper[];
-extern u8 *keystate;
+extern const u8 *keystate;
 extern u32 userevent;
 extern int updatebuf;
 extern int updatescreen;
