@@ -55,6 +55,7 @@ struct Col
 #define WIDTH  (2*FBWIDTH)
 #define HEIGHT (2*FBHEIGHT)
 
+SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Texture *screentex;
 u8 *keystate;
@@ -485,7 +486,7 @@ int ctrl;
 int shift;
 
 void
-keydown(SDL_Keysym keysym)
+keydown(SDL_Keysym keysym, int repeat)
 {
 	char *keys;
 	int key;
@@ -500,10 +501,11 @@ keydown(SDL_Keysym keysym)
 	if(keystate[SDL_SCANCODE_LGUI] || keystate[SDL_SCANCODE_RGUI])
 		return;
 
-	if(keysym.scancode == SDL_SCANCODE_F1){
-		updatebuf = 1;
-		updatescreen = 1;
-		draw();
+	if(keysym.scancode == SDL_SCANCODE_F11 && !repeat){
+		u32 f = SDL_GetWindowFlags(window) &
+			SDL_WINDOW_FULLSCREEN_DESKTOP;
+		SDL_SetWindowFullscreen(window,
+			f ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
 	}
 
 /*
@@ -613,7 +615,6 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	SDL_Window *window;
 	SDL_Event ev;
 	int mod;
 	int x, y;
@@ -678,7 +679,7 @@ main(int argc, char *argv[])
 		for(y = 0; y < TERMHEIGHT; y++)
 			fb[y][x] = ' ';
 
-	initblur(1.5);
+	initblur(1.0);
 	createfont();
 
 	pthread_create(&thr1, NULL, readthread, NULL);
@@ -690,7 +691,7 @@ main(int argc, char *argv[])
 			goto out;
 
 		case SDL_KEYDOWN:
-			keydown(ev.key.keysym);
+			keydown(ev.key.keysym, ev.key.repeat);
 			break;
 		case SDL_KEYUP:
 			keyup(ev.key.keysym);
