@@ -63,6 +63,9 @@ char *scancodemap_both[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_PERIOD] = ".>",
 	[SDL_SCANCODE_SLASH] = "/?",
 	[SDL_SCANCODE_SPACE] = "  ",
+
+	[SDL_SCANCODE_LALT] = "\033\033",
+	[SDL_SCANCODE_RALT] = "\033\033",
 };
 
 char *scancodemap_upper[SDL_NUM_SCANCODES] = {
@@ -123,6 +126,9 @@ char *scancodemap_upper[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_PERIOD] = ".>",
 	[SDL_SCANCODE_SLASH] = "/?",
 	[SDL_SCANCODE_SPACE] = "  ",
+
+	[SDL_SCANCODE_LALT] = "\033\033",
+	[SDL_SCANCODE_RALT] = "\033\033",
 };
 
 int ctrl;
