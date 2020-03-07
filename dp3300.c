@@ -23,14 +23,6 @@
 #include "terminal.h"
 #include "args.h"
 
-/* pixel fmt: RGBA */
-//u32 fg = 0x94FF00FF;
-//u32 fg = 0x00FF00FF;	// green
-//u32 fg = 0x0CCC68FF;	// green
-//u32 fg = 0xFFFFFFFF;
-//u32 fg = 0xFFD300FF;	// amber
-//u32 bg = 0x000000FF;
-
 //Col phos1 = { 0xFF, 0x82, 0xFF, 0x0F };
 Col phos1 = { 0xFF, 0x9F, 0xFF, 0x47 };
 Col phos2 = { 0xFF, 0x68, 0xCC, 0x0C };
@@ -57,7 +49,6 @@ SDL_Texture *screentex;
 const u8 *keystate;
 char fb[TERMHEIGHT][TERMWIDTH];
 int curx, cury;
-int baud = 330;
 u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
@@ -366,6 +357,7 @@ main(int argc, char *argv[])
 	SDL_Init(SDL_INIT_EVERYTHING);
 	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
 		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
+	SDL_SetWindowTitle(window, "Datapoint 3300");
 
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 

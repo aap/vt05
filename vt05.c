@@ -48,7 +48,6 @@ SDL_Texture *screentex;
 const u8 *keystate;
 char fb[TERMHEIGHT][TERMWIDTH];
 int curx, cury;
-int baud = 330;
 u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
@@ -383,6 +382,9 @@ main(int argc, char *argv[])
 	SDL_Init(SDL_INIT_EVERYTHING);
 	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
 		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
+	SDL_SetWindowTitle(window, "VT05");
+
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);

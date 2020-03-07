@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include <unistd.h>
+#include <time.h>
 #include "terminal.h"
 
 /* Common code for all terminals */
@@ -282,6 +283,8 @@ keyup(SDL_Keysym keysym)
 	}
 }
 
+int baud;
+
 void*
 readthread(void *p)
 {
@@ -292,15 +295,18 @@ readthread(void *p)
 	SDL_memset(&ev, 0, sizeof(SDL_Event));
 	ev.type = userevent;
 
+	if(baud)
+		slp.tv_nsec = 1000*1000*1000 / (baud/11);
+
 	while(1){
 		if(read(pty, &c, 1) < 0)
 			exit(0);
 		recvchar(c);
 
-		/* simulate baudrate, TODO: get from tty */
-//		slp.tv_nsec = 1000*1000*1000 / (baud/11);
-//		nanosleep(&slp, NULL);
-
 		SDL_PushEvent(&ev);
+
+		/* simulate baudrate */
+		if(baud)
+			nanosleep(&slp, NULL);
 	}
 }

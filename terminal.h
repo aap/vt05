@@ -15,7 +15,6 @@ extern Col phos1, phos2;
 extern float Gamma;
 extern int altesc;
 
-
 void panic(char *fmt, ...);
 
 #define BLURRADIUS 4
@@ -28,6 +27,7 @@ void keydown(SDL_Keysym keysym, int repeat);
 void draw(void);
 void recvchar(int c);
 
+extern int baud;
 extern char **scancodemap;
 extern char *scancodemap_both[];
 extern char *scancodemap_upper[];
