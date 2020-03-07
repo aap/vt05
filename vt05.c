@@ -22,22 +22,6 @@
 #include "terminal.h"
 #include "args.h"
 
-SDL_Surface *screen;
-
-/* pixel fmt: RGBA */
-//u32 fg = 0x94FF00FF;
-//u32 fg = 0x00FF00FF;	// green
-//u32 fg = 0x0CCC68FF;	// green
-u32 fg = 0xFFFFFFFF;
-//u32 fg = 0xFFD300FF;	// amber
-u32 bg = 0x000000FF;
-
-typedef struct Col Col;
-struct Col
-{
-	u8 a, b, g, r;
-};
-
 #include "vt05chars.h"
 
 #define TERMWIDTH 72
@@ -52,6 +36,12 @@ struct Col
 #define WIDTH  (2*FBWIDTH)
 #define HEIGHT (2*FBHEIGHT)
 
+Col phos1 = { 0xFF, 0xFF, 0xFF, 0xFF };
+Col phos2 = { 0xFF, 0xFF, 0xB0, 0x40 };
+float Gamma = 1.0/2.2f;
+
+
+SDL_Surface *screen;
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Texture *screentex;
@@ -68,76 +58,6 @@ SDL_Texture *fonttex[64];
 
 int pty;
 
-void
-panic(char *fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	fprintf(stderr, "\n");
-	va_end(ap);
-	exit(1);
-}
-
-#define BLURRADIUS 4
-#define MATSIZ (2*BLURRADIUS+1)
-
-float blurmat[MATSIZ][MATSIZ];
-
-void
-initblur(float sig)
-{
-	int i, j;
-	float dx, dy, dist;
-
-	for(i = 0; i < MATSIZ; i++)
-		for(j = 0; j < MATSIZ; j++){
-			dx = i-BLURRADIUS;
-			dy = j-BLURRADIUS;
-			dist = sqrt(dx*dx + dy*dy);
-			blurmat[i][j] = exp(-(dx*dx + dy*dy)/(2*sig*sig)) / (2*M_PI*sig*sig);
-		}
-}
-
-float Gamma = 1.0/2.2f;
-
-Col
-getblur(Col *src, int width, int height, int x, int y)
-{
-	int xx, yy;
-	Col *p;
-	int i, j;
-	int r, g, b, a;
-	Col c;
-
-	r = g = b = a = 0;
-	for(i = 0, yy = y-BLURRADIUS; yy <= y+BLURRADIUS; yy++, i++){
-		if(yy < 0 || yy >= height)
-			continue;
-		for(j = 0, xx = x-BLURRADIUS; xx <= x+BLURRADIUS; xx++, j++){
-			if(xx < 0 || xx >= width)
-				continue;
-			p = &src[yy*width + xx];
-			r += p->r * blurmat[i][j];
-			g += p->g * blurmat[i][j];
-			b += p->b * blurmat[i][j];
-			a += p->a * blurmat[i][j];
-		}
-	}
-	c.r = pow(r/255.0f, Gamma)*255;
-	c.g = pow(g/255.0f, Gamma)*255;
-	c.b = pow(b/255.0f, Gamma)*255;
-	c.a = pow(a/255.0f, Gamma)*255;
-
-	p = &src[y*width + x];
-	if(p->r > c.r) c.r = p->r;
-	if(p->g > c.g) c.g = p->g;
-	if(p->b > c.b) c.b = p->b;
-	if(p->a > c.a) c.a = p->a;
-
-	return c;
-}
-
 #define TEXW ((CWIDTH*2 + BLURRADIUS*2))
 #define TEXH ((CHEIGHT*2 + BLURRADIUS*2))
 
@@ -153,11 +73,11 @@ createchar(u32 *raster, int c)
 	for(i = 0; i < CHEIGHT; i++){
 		for(j = 0; j < CWIDTH; j++){
 			if(chr[i*CWIDTH+j] == '*'){
-				raster[(i*2+0)*TEXW + j*2] = fg;
-				raster[(i*2+0)*TEXW + j*2+1] = fg;
+				raster[(i*2+0)*TEXW + j*2] = 0xFF;
+				raster[(i*2+0)*TEXW + j*2+1] = 0xFF;
 			// uncomment to disable scanlines
-			//	raster[(i*2+1)*TEXW + j*2] = fg;
-			//	raster[(i*2+1)*TEXW + j*2+1] = fg;
+			//	raster[(i*2+1)*TEXW + j*2] = 0xFF;
+			//	raster[(i*2+1)*TEXW + j*2+1] = 0xFF;
 			}
 		}
 	}
@@ -396,7 +316,7 @@ char *argv0;
 void
 usage(void)
 {
-	panic("usage: %s [-b baudrate]", argv0);
+	panic("usage: %s [-a] [-B] [-b baudrate]", argv0);
 }
 
 int
@@ -411,6 +331,9 @@ main(int argc, char *argv[])
 	scancodemap = scancodemap_upper;
 
 	ARGBEGIN{
+	case 'a':
+		altesc = 1;
+		break;
 	case 'b':
 		baud = atoi(EARGF(usage()));
 		break;
@@ -472,7 +395,7 @@ main(int argc, char *argv[])
 		for(y = 0; y < TERMHEIGHT; y++)
 			fb[y][x] = ' ';
 
-	initblur(1.0);
+	initblur(1.3);
 	createfont();
 
 	pthread_create(&thr1, NULL, readthread, NULL);

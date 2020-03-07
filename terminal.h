@@ -5,6 +5,23 @@ typedef uint32_t u32;
 typedef uint8_t u8;
 #define nil NULL
 
+typedef struct Col Col;
+struct Col
+{
+	u8 a, b, g, r;
+};
+
+extern Col phos1, phos2;
+extern float Gamma;
+extern int altesc;
+
+
+void panic(char *fmt, ...);
+
+#define BLURRADIUS 4
+Col getblur(Col *src, int width, int height, int x, int y);
+void initblur(float sig);
+
 void* readthread(void *p);
 void keyup(SDL_Keysym keysym);
 void keydown(SDL_Keysym keysym, int repeat);

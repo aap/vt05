@@ -2,6 +2,84 @@
 #include <unistd.h>
 #include "terminal.h"
 
+/* Common code for all terminals */
+
+void
+panic(char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+	va_end(ap);
+	exit(1);
+}
+
+
+
+#define MATSIZ (2*BLURRADIUS+1)
+float blurmat[MATSIZ][MATSIZ];
+
+Col
+getblur(Col *src, int width, int height, int x, int y)
+{
+	int xx, yy;
+	Col *p;
+	int i, j;
+	int r, g, b, a;
+	Col c;
+
+	r = g = b = a = 0;
+	for(i = 0, yy = y-BLURRADIUS; yy <= y+BLURRADIUS; yy++, i++){
+		if(yy < 0 || yy >= height)
+			continue;
+		for(j = 0, xx = x-BLURRADIUS; xx <= x+BLURRADIUS; xx++, j++){
+			if(xx < 0 || xx >= width)
+				continue;
+			p = &src[yy*width + xx];
+			r += p->r * blurmat[i][j];
+			g += p->g * blurmat[i][j];
+			b += p->b * blurmat[i][j];
+			a += p->a * blurmat[i][j];
+		}
+	}
+	c.r = pow(r/255.0f, Gamma)*255;
+	c.g = pow(g/255.0f, Gamma)*255;
+	c.b = pow(b/255.0f, Gamma)*255;
+	c.a = pow(a/255.0f, Gamma)*255;
+
+	p = &src[y*width + x];
+	if(p->a > c.a){
+		// full brightness
+		c = phos1;
+	}else{
+		// glow
+		c.r = phos2.r*c.a/255.0f;
+		c.g = phos2.g*c.a/255.0f;
+		c.b = phos2.b*c.a/255.0f;
+		c.a = 255;
+	}
+
+	return c;
+}
+
+void
+initblur(float sig)
+{
+	int i, j;
+	float dx, dy, dist;
+
+	for(i = 0; i < MATSIZ; i++)
+		for(j = 0; j < MATSIZ; j++){
+			dx = i-BLURRADIUS;
+			dy = j-BLURRADIUS;
+			dist = sqrt(dx*dx + dy*dy);
+			blurmat[i][j] = exp(-(dx*dx + dy*dy)/(2*sig*sig)) / (2*M_PI*sig*sig);
+		}
+}
+
+
+
 char **scancodemap;
 
 /* Map SDL scancodes to ASCII */
@@ -133,12 +211,15 @@ char *scancodemap_upper[SDL_NUM_SCANCODES] = {
 
 int ctrl;
 int shift;
+int alt;
+int altesc;
 
 void
 keydown(SDL_Keysym keysym, int repeat)
 {
 	char *keys;
 	int key;
+	char buf[2];
 
 	switch(keysym.scancode){
 	case SDL_SCANCODE_LSHIFT:
@@ -149,6 +230,11 @@ keydown(SDL_Keysym keysym, int repeat)
 	}
 	if(keystate[SDL_SCANCODE_LGUI] || keystate[SDL_SCANCODE_RGUI])
 		return;
+	if(keysym.scancode == SDL_SCANCODE_LALT || keysym.scancode == SDL_SCANCODE_RALT)
+		if(!altesc){
+			alt = 1;
+			return;
+		}
 
 	if(keysym.scancode == SDL_SCANCODE_F11 && !repeat){
 		u32 f = SDL_GetWindowFlags(window) &
@@ -166,9 +252,16 @@ keydown(SDL_Keysym keysym, int repeat)
 		key &= 037;
 //	printf("%o(%d %d) %c\n", key, shift, ctrl, key);
 
-	char c = key;
-	write(pty, &c, 1);
-/*
+	if(alt){
+		buf[0] = '\033';
+		buf[1] = key;
+		write(pty, buf, 2);
+	}else{
+		buf[0] = key;
+		write(pty, buf, 1);
+	}
+
+/*	// local echo for testing
 	recvchar(c);
 	updatebuf = 1;
 	draw();
@@ -184,6 +277,8 @@ keyup(SDL_Keysym keysym)
 	case SDL_SCANCODE_CAPSLOCK:
 	case SDL_SCANCODE_LCTRL:
 	case SDL_SCANCODE_RCTRL: ctrl = 0; return;
+	case SDL_SCANCODE_LALT:
+	case SDL_SCANCODE_RALT: alt = 0; return;
 	}
 }
 
