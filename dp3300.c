@@ -53,6 +53,7 @@ u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
 int blink;
+int arrows = 0;
 
 SDL_Texture *fonttex[65];
 
@@ -66,6 +67,13 @@ createchar(u32 *raster, int c)
 {
 	int i, j;
 	char *chr = font[c + ' '];
+
+	if (arrows) {
+		if (c == '^' - ' ')
+			chr = font[0141];
+		else if (c == '_' - ' ')
+			chr = font[0142];
+	}
 
 	memset(raster, 0, TEXW*TEXH*sizeof(u32));
 	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
@@ -290,7 +298,7 @@ char *argv0;
 void
 usage(void)
 {
-	panic("usage: %s [-B] [-b baudrate]", argv0);
+	panic("usage: %s [-a] [-B] [-b baudrate]", argv0);
 }
 
 int
@@ -305,6 +313,9 @@ main(int argc, char *argv[])
 	scancodemap = scancodemap_upper;
 
 	ARGBEGIN{
+	case 'a':
+		arrows = 1;
+		break;
 	case 'b':
 		baud = atoi(EARGF(usage()));
 		break;
