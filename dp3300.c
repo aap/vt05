@@ -290,7 +290,7 @@ char *argv0;
 void
 usage(void)
 {
-	panic("usage: %s [-a] [-B] [-b baudrate]", argv0);
+	panic("usage: %s [-B] [-b baudrate]", argv0);
 }
 
 int
@@ -305,9 +305,6 @@ main(int argc, char *argv[])
 	scancodemap = scancodemap_upper;
 
 	ARGBEGIN{
-	case 'a':
-		altesc = 1;
-		break;
 	case 'b':
 		baud = atoi(EARGF(usage()));
 		break;
