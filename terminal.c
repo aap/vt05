@@ -142,9 +142,6 @@ char *scancodemap_both[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_PERIOD] = ".>",
 	[SDL_SCANCODE_SLASH] = "/?",
 	[SDL_SCANCODE_SPACE] = "  ",
-
-	[SDL_SCANCODE_LALT] = "\033\033",
-	[SDL_SCANCODE_RALT] = "\033\033",
 };
 
 char *scancodemap_upper[SDL_NUM_SCANCODES] = {
@@ -205,15 +202,11 @@ char *scancodemap_upper[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_PERIOD] = ".>",
 	[SDL_SCANCODE_SLASH] = "/?",
 	[SDL_SCANCODE_SPACE] = "  ",
-
-	[SDL_SCANCODE_LALT] = "\033\033",
-	[SDL_SCANCODE_RALT] = "\033\033",
 };
 
 int ctrl;
 int shift;
 int alt;
-int altesc;
 
 void
 keydown(SDL_Keysym keysym, int repeat)
@@ -231,11 +224,10 @@ keydown(SDL_Keysym keysym, int repeat)
 	}
 	if(keystate[SDL_SCANCODE_LGUI] || keystate[SDL_SCANCODE_RGUI])
 		return;
-	if(keysym.scancode == SDL_SCANCODE_LALT || keysym.scancode == SDL_SCANCODE_RALT)
-		if(!altesc){
-			alt = 1;
-			return;
-		}
+	if(keysym.scancode == SDL_SCANCODE_LALT || keysym.scancode == SDL_SCANCODE_RALT) {
+		alt = 1;
+		return;
+	}
 
 	if(keysym.scancode == SDL_SCANCODE_F11 && !repeat){
 		u32 f = SDL_GetWindowFlags(window) &
