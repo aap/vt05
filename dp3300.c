@@ -54,6 +54,7 @@ int updatebuf = 1;
 int updatescreen = 1;
 int blink;
 int arrows = 0;
+int rerun = 0;
 
 SDL_Texture *fonttex[65];
 
@@ -294,6 +295,7 @@ shell(void)
 
 
 char *argv0;
+char *name;
 
 void
 usage(void)
@@ -323,6 +325,9 @@ main(int argc, char *argv[])
 		/* Backspace is Rubout. */
 		scancodemap[SDL_SCANCODE_BACKSPACE] = "\177\177";
 		break;
+	case 'r':
+		rerun = 1;
+		break;
 	}ARGEND;
 
 	cmd = &argv[0];
@@ -333,7 +338,7 @@ main(int argc, char *argv[])
 	   unlockpt(pty) < 0)
 		panic("Couldn't get pty");
 
-	char *name = ptsname(pty);
+	name = ptsname(pty);
 
 	ws.ws_row = TERMHEIGHT;
 	ws.ws_col = TERMWIDTH;
@@ -341,26 +346,7 @@ main(int argc, char *argv[])
 	ws.ws_ypixel = FBHEIGHT;
 	ioctl(pty, TIOCSWINSZ, &ws);
 
-	switch(fork()){
-	case -1:
-		panic("fork failed");
-
-	case 0:
-		close(pty);
-		close(0);
-		close(1);
-		close(2);
-
-		setsid();
-
-		if(open(name, O_RDWR) != 0)
-			exit(1);
-		dup(0);
-		dup(1);
-
-		shell();
-	}
-
+	spawn();
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)

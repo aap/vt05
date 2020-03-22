@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include <unistd.h>
 #include <time.h>
+#include <fcntl.h>
 #include "terminal.h"
 
 /* Common code for all terminals */
@@ -291,8 +292,14 @@ readthread(void *p)
 		slp.tv_nsec = 1000*1000*1000 / (baud/11);
 
 	while(1){
-		if(read(pty, &c, 1) < 0)
-			exit(0);
+		if(read(pty, &c, 1) < 0){
+			if(rerun){
+				sleep(2);
+				spawn();
+			}else{
+				exit(0);
+			}
+		}
 		recvchar(c);
 
 		SDL_PushEvent(&ev);
@@ -300,5 +307,29 @@ readthread(void *p)
 		/* simulate baudrate */
 		if(baud)
 			nanosleep(&slp, NULL);
+	}
+}
+
+void spawn(void)
+{
+	switch(fork()){
+	case -1:
+		panic("fork failed");
+
+	case 0:
+		close(pty);
+		close(0);
+		close(1);
+		close(2);
+
+		setsid();
+
+		if(open(name, O_RDWR) != 0)
+			exit(1);
+		dup(0);
+		dup(1);
+
+
+		shell();
 	}
 }
