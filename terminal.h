@@ -26,8 +26,11 @@ void keyup(SDL_Keysym keysym);
 void keydown(SDL_Keysym keysym, int repeat);
 void draw(void);
 void recvchar(int c);
+void shell(void);
+void spawn(void);
 
 extern int baud;
+extern int rerun;
 extern char **scancodemap;
 extern char *scancodemap_both[];
 extern char *scancodemap_upper[];
@@ -37,5 +40,6 @@ extern int updatebuf;
 extern int updatescreen;
 extern int pty;
 extern SDL_Window *window;
+extern char *name;
 
 #endif /* TERMINAL_H */
