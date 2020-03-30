@@ -54,6 +54,7 @@ int updatebuf = 1;
 int updatescreen = 1;
 int blink;
 int rerun = 0;
+int scale = 1;
 
 SDL_Texture *fonttex[65];
 
@@ -266,7 +267,7 @@ char *name;
 void
 usage(void)
 {
-	panic("usage: %s [-a] [-B] [-b baudrate]", argv0);
+	panic("usage: %s [-2] [-B] [-b baudrate]", argv0);
 }
 
 int
@@ -290,6 +291,9 @@ main(int argc, char *argv[])
 		break;
 	case 'r':
 		rerun = 1;
+		break;
+	case '2':
+		scale++;
 		break;
 	}ARGEND;
 
@@ -331,7 +335,7 @@ main(int argc, char *argv[])
 
 
 	SDL_Init(SDL_INIT_EVERYTHING);
-	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
+	if(SDL_CreateWindowAndRenderer(WIDTH*scale, HEIGHT*scale, 0, &window, &renderer) < 0)
 		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 	SDL_SetWindowTitle(window, "Datanet 760");
 
