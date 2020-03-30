@@ -55,6 +55,7 @@ int updatescreen = 1;
 int blink;
 int rerun = 0;
 int scale = 1;
+int full = 0;
 
 SDL_Texture *fonttex[65];
 
@@ -267,7 +268,7 @@ char *name;
 void
 usage(void)
 {
-	panic("usage: %s [-2] [-B] [-b baudrate]", argv0);
+	panic("usage: %s [-2] [-B] [-f] [-b baudrate]", argv0);
 }
 
 int
@@ -294,6 +295,9 @@ main(int argc, char *argv[])
 		break;
 	case '2':
 		scale++;
+		break;
+	case 'f':
+		full = 1;
 		break;
 	}ARGEND;
 
@@ -356,6 +360,9 @@ main(int argc, char *argv[])
 
 	pthread_create(&thr1, NULL, readthread, NULL);
 	pthread_create(&thr2, NULL, timethread, NULL);
+
+	if(full)
+		toggle_fullscreen();
 
 	while(SDL_WaitEvent(&ev) >= 0){
 		switch(ev.type){
