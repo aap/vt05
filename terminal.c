@@ -210,6 +210,15 @@ int shift;
 int alt;
 
 void
+toggle_fullscreen(void)
+{
+	u32 f = SDL_GetWindowFlags(window) &
+		SDL_WINDOW_FULLSCREEN_DESKTOP;
+	SDL_SetWindowFullscreen(window,
+		f ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+}
+
+void
 keydown(SDL_Keysym keysym, int repeat)
 {
 	char *keys;
@@ -230,12 +239,8 @@ keydown(SDL_Keysym keysym, int repeat)
 		return;
 	}
 
-	if(keysym.scancode == SDL_SCANCODE_F11 && !repeat){
-		u32 f = SDL_GetWindowFlags(window) &
-			SDL_WINDOW_FULLSCREEN_DESKTOP;
-		SDL_SetWindowFullscreen(window,
-			f ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
-	}
+	if(keysym.scancode == SDL_SCANCODE_F11 && !repeat)
+		toggle_fullscreen();
 
 	keys = scancodemap[keysym.scancode];
 	/* TODO: implement keypad */

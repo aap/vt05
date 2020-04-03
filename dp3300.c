@@ -55,6 +55,8 @@ int updatescreen = 1;
 int blink;
 int arrows = 0;
 int rerun = 0;
+int scale = 1;
+int full = 0;
 
 SDL_Texture *fonttex[65];
 
@@ -300,7 +302,7 @@ char *name;
 void
 usage(void)
 {
-	panic("usage: %s [-a] [-B] [-b baudrate]", argv0);
+	panic("usage: %s [-2] [-a] [-B] [-f] [-b baudrate]", argv0);
 }
 
 int
@@ -328,6 +330,12 @@ main(int argc, char *argv[])
 	case 'r':
 		rerun = 1;
 		break;
+	case '2':
+		scale++;
+		break;
+	case 'f':
+		full = 1;
+		break;
 	}ARGEND;
 
 	cmd = &argv[0];
@@ -349,7 +357,7 @@ main(int argc, char *argv[])
 	spawn();
 
 	SDL_Init(SDL_INIT_EVERYTHING);
-	if(SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &window, &renderer) < 0)
+	if(SDL_CreateWindowAndRenderer(WIDTH*scale, HEIGHT*scale, 0, &window, &renderer) < 0)
 		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 	SDL_SetWindowTitle(window, "Datapoint 3300");
 
@@ -370,6 +378,9 @@ main(int argc, char *argv[])
 
 	pthread_create(&thr1, NULL, readthread, NULL);
 	pthread_create(&thr2, NULL, timethread, NULL);
+
+	if(full)
+		toggle_fullscreen();
 
 	while(SDL_WaitEvent(&ev) >= 0){
 		switch(ev.type){

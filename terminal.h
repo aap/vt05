@@ -28,6 +28,7 @@ void draw(void);
 void recvchar(int c);
 void shell(void);
 void spawn(void);
+void toggle_fullscreen(void);
 
 extern int baud;
 extern int rerun;
