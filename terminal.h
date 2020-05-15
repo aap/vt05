@@ -29,6 +29,7 @@ void recvchar(int c);
 void shell(void);
 void spawn(void);
 void toggle_fullscreen(void);
+void stretch(SDL_Rect *r, int width, int height);
 
 extern int baud;
 extern int rerun;
@@ -42,5 +43,6 @@ extern int updatescreen;
 extern int pty;
 extern SDL_Window *window;
 extern char *name;
+extern SDL_Renderer *renderer;
 
 #endif /* TERMINAL_H */

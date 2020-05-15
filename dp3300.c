@@ -164,8 +164,12 @@ draw(void)
 		updatescreen = 1;
 	}
 	if(updatescreen){
+		SDL_Rect screenrect;
+		stretch(&screenrect, WIDTH, HEIGHT);
 		updatescreen = 0;
-		SDL_RenderCopy(renderer, screentex, nil, nil);
+		SDL_SetRenderDrawColor(renderer, 21, 13, 6, 0);
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, screentex, nil, &screenrect);
 		SDL_RenderPresent(renderer);
 	}
 }

@@ -219,6 +219,24 @@ toggle_fullscreen(void)
 }
 
 void
+stretch(SDL_Rect *r, int width, int height)
+{
+	int w, h;
+	SDL_GetRendererOutputSize(renderer, &w, &h);
+	if ((double)h / height < (double)w / width){
+		r->w = width * h / height;
+		r->h = h;
+		r->x = (w - r->w) / 2;
+		r->y = 0;
+	}else{
+		r->w = w;
+		r->h = height * w / width;
+		r->x = 0;
+		r->y = (h - r->h) / 2;
+	}
+}
+
+void
 keydown(SDL_Keysym keysym, int repeat)
 {
 	char *keys;
