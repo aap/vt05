@@ -302,7 +302,7 @@ char *name;
 void
 usage(void)
 {
-	panic("usage: %s [-2] [-a] [-B] [-f] [-b baudrate]", argv0);
+	panic("usage: %s [-2] [-a] [-B] [-f] [-b baudrate] command...", argv0);
 }
 
 int
@@ -336,7 +336,13 @@ main(int argc, char *argv[])
 	case 'f':
 		full = 1;
 		break;
+	default:
+		usage();
+		break;
 	}ARGEND;
+
+	if (argc == 0)
+		usage();
 
 	cmd = &argv[0];
 
@@ -362,6 +368,7 @@ main(int argc, char *argv[])
 	SDL_SetWindowTitle(window, "Datapoint 3300");
 
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	SDL_SetHint("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
