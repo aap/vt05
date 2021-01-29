@@ -362,7 +362,7 @@ char *name;
 void
 usage(void)
 {
-	panic("usage: %s [-B] [-r] [-2] [-f] [-b baudrate]", argv0);
+	panic("usage: %s [-B] [-r] [-2] [-f] [-b baudrate] command...", argv0);
 }
 
 int
@@ -393,7 +393,13 @@ main(int argc, char *argv[])
 	case 'f':
 		full = 1;
 		break;
+	default:
+		usage();
+		break;
 	}ARGEND;
+
+	if (argc == 0)
+		usage();
 
 	cmd = &argv[0];
 
