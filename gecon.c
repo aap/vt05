@@ -323,26 +323,7 @@ main(int argc, char *argv[])
 	ws.ws_ypixel = FBHEIGHT;
 	ioctl(pty, TIOCSWINSZ, &ws);
 
-	switch(fork()){
-	case -1:
-		panic("fork failed");
-
-	case 0:
-		close(pty);
-		close(0);
-		close(1);
-		close(2);
-
-		setsid();
-
-		if(open(name, O_RDWR) != 0)
-			exit(1);
-		dup(0);
-		dup(1);
-
-		shell();
-	}
-
+	spawn();
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 	if(SDL_CreateWindowAndRenderer(WIDTH*scale, HEIGHT*scale, 0, &window, &renderer) < 0)
