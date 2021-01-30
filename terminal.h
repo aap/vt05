@@ -1,6 +1,8 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include <sys/ioctl.h>
+
 typedef uint32_t u32;
 typedef uint8_t u8;
 #define nil NULL
@@ -28,6 +30,9 @@ void draw(void);
 void recvchar(int c);
 void shell(void);
 void spawn(void);
+void mkpty(struct winsize *ws, int th, int tw, int fw, int fh);
+void mkwindow(SDL_Window **window, SDL_Renderer **renderer,
+	      char *title, int width, int height);
 void toggle_fullscreen(void);
 
 extern int baud;

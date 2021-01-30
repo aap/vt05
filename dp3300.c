@@ -346,29 +346,10 @@ main(int argc, char *argv[])
 
 	cmd = &argv[0];
 
-	pty = posix_openpt(O_RDWR);
-	if(pty < 0 ||
-	   grantpt(pty) < 0 ||
-	   unlockpt(pty) < 0)
-		panic("Couldn't get pty");
-
-	name = ptsname(pty);
-
-	ws.ws_row = TERMHEIGHT;
-	ws.ws_col = TERMWIDTH;
-	ws.ws_xpixel = FBWIDTH;
-	ws.ws_ypixel = FBHEIGHT;
-	ioctl(pty, TIOCSWINSZ, &ws);
-
+	mkpty(&ws, TERMHEIGHT, TERMWIDTH, FBWIDTH, FBHEIGHT);
 	spawn();
 
-	SDL_Init(SDL_INIT_EVERYTHING);
-	if(SDL_CreateWindowAndRenderer(WIDTH*scale, HEIGHT*scale, 0, &window, &renderer) < 0)
-		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
-	SDL_SetWindowTitle(window, "Datapoint 3300");
-
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-	SDL_SetHint("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
+	mkwindow(&window, &renderer, "Datapoint 3300", WIDTH*scale, HEIGHT*scale);
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);

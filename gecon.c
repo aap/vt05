@@ -309,47 +309,10 @@ main(int argc, char *argv[])
 
 	cmd = &argv[0];
 
-	pty = posix_openpt(O_RDWR);
-	if(pty < 0 ||
-	   grantpt(pty) < 0 ||
-	   unlockpt(pty) < 0)
-		panic("Couldn't get pty");
+	mkpty(&ws, TERMHEIGHT, TERMWIDTH, FBWIDTH, FBHEIGHT);
+	spawn();
 
-	name = ptsname(pty);
-
-	ws.ws_row = TERMHEIGHT;
-	ws.ws_col = TERMWIDTH;
-	ws.ws_xpixel = FBWIDTH;
-	ws.ws_ypixel = FBHEIGHT;
-	ioctl(pty, TIOCSWINSZ, &ws);
-
-	switch(fork()){
-	case -1:
-		panic("fork failed");
-
-	case 0:
-		close(pty);
-		close(0);
-		close(1);
-		close(2);
-
-		setsid();
-
-		if(open(name, O_RDWR) != 0)
-			exit(1);
-		dup(0);
-		dup(1);
-
-		shell();
-	}
-
-
-	SDL_Init(SDL_INIT_EVERYTHING);
-	if(SDL_CreateWindowAndRenderer(WIDTH*scale, HEIGHT*scale, 0, &window, &renderer) < 0)
-		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
-	SDL_SetWindowTitle(window, "Datanet 760");
-
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	mkwindow(&window, &renderer, "Datapoint 3300", WIDTH*scale, HEIGHT*scale);
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);

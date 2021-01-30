@@ -1,5 +1,8 @@
+#define _XOPEN_SOURCE 600
+
 #include <SDL.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <time.h>
 #include <fcntl.h>
 #include "terminal.h"
@@ -337,4 +340,33 @@ void spawn(void)
 
 		shell();
 	}
+}
+
+void mkpty(struct winsize *ws, int th, int tw, int fw, int fh)
+{
+	pty = posix_openpt(O_RDWR);
+	if(pty < 0 ||
+	   grantpt(pty) < 0 ||
+	   unlockpt(pty) < 0)
+		panic("Couldn't get pty");
+
+	name = ptsname(pty);
+
+	ws->ws_row = th;
+	ws->ws_col = tw;
+	ws->ws_xpixel = fw;
+	ws->ws_ypixel = fh;
+	ioctl(pty, TIOCSWINSZ, ws);
+}
+
+void mkwindow(SDL_Window **window, SDL_Renderer **renderer,
+	      char *title, int width, int height)
+{
+	SDL_Init(SDL_INIT_EVERYTHING);
+	if(SDL_CreateWindowAndRenderer(width, height, 0, window, renderer) < 0)
+		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
+	SDL_SetWindowTitle(*window, title);
+
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	SDL_SetHint("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
 }
