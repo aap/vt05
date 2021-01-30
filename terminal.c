@@ -358,3 +358,15 @@ void mkpty(struct winsize *ws, int th, int tw, int fw, int fh)
 	ws->ws_ypixel = fh;
 	ioctl(pty, TIOCSWINSZ, ws);
 }
+
+void mkwindow(SDL_Window **window, SDL_Renderer **renderer,
+	      char *title, int width, int height)
+{
+	SDL_Init(SDL_INIT_EVERYTHING);
+	if(SDL_CreateWindowAndRenderer(width, height, 0, window, renderer) < 0)
+		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
+	SDL_SetWindowTitle(*window, title);
+
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	SDL_SetHint("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
+}

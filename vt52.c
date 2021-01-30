@@ -406,13 +406,7 @@ main(int argc, char *argv[])
 	mkpty(&ws, TERMHEIGHT, TERMWIDTH, FBWIDTH, FBHEIGHT);
 	spawn();
 
-	SDL_Init(SDL_INIT_EVERYTHING);
-
-	if(SDL_CreateWindowAndRenderer(WIDTH*scale, HEIGHT*scale, 0, &window, &renderer) < 0)
-		panic("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
-	SDL_SetWindowTitle(window, "VT52");
-
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	mkwindow(&window, &renderer, "Datapoint 3300", WIDTH*scale, HEIGHT*scale);
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
