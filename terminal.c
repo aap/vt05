@@ -1,5 +1,8 @@
+#define _XOPEN_SOURCE 600
+
 #include <SDL.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <time.h>
 #include <fcntl.h>
 #include "terminal.h"
@@ -337,4 +340,21 @@ void spawn(void)
 
 		shell();
 	}
+}
+
+void mkpty(struct winsize *ws, int th, int tw, int fw, int fh)
+{
+	pty = posix_openpt(O_RDWR);
+	if(pty < 0 ||
+	   grantpt(pty) < 0 ||
+	   unlockpt(pty) < 0)
+		panic("Couldn't get pty");
+
+	name = ptsname(pty);
+
+	ws->ws_row = th;
+	ws->ws_col = tw;
+	ws->ws_xpixel = fw;
+	ws->ws_ypixel = fh;
+	ioctl(pty, TIOCSWINSZ, ws);
 }

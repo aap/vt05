@@ -360,20 +360,7 @@ main(int argc, char *argv[])
 
 	cmd = &argv[0];
 
-	pty = posix_openpt(O_RDWR);
-	if(pty < 0 ||
-	   grantpt(pty) < 0 ||
-	   unlockpt(pty) < 0)
-		panic("Couldn't get pty");
-
-	name = ptsname(pty);
-
-	ws.ws_row = TERMHEIGHT;
-	ws.ws_col = TERMWIDTH;
-	ws.ws_xpixel = FBWIDTH;
-	ws.ws_ypixel = FBHEIGHT;
-	ioctl(pty, TIOCSWINSZ, &ws);
-
+	mkpty(&ws, TERMHEIGHT, TERMWIDTH, FBWIDTH, FBHEIGHT);
 	spawn();
 
 	SDL_Init(SDL_INIT_EVERYTHING);
