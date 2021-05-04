@@ -106,7 +106,7 @@ blurchar(u32 *dst, u32 *src)
 void
 createfont(void)
 {
-	int i, j;
+	int i;
 	int w, h;
 	u32 *ras1, *ras2;
 	w = TEXW;
@@ -275,7 +275,6 @@ int
 main(int argc, char *argv[])
 {
 	SDL_Event ev;
-	int mod;
 	int x, y;
 	pthread_t thr1, thr2;
 	struct winsize ws;
