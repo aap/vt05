@@ -72,13 +72,12 @@ void
 initblur(float sig)
 {
 	int i, j;
-	float dx, dy, dist;
+	float dx, dy;
 
 	for(i = 0; i < MATSIZ; i++)
 		for(j = 0; j < MATSIZ; j++){
 			dx = i-BLURRADIUS;
 			dy = j-BLURRADIUS;
-			dist = sqrt(dx*dx + dy*dy);
 			blurmat[i][j] = exp(-(dx*dx + dy*dy)/(2*sig*sig)) / (2*M_PI*sig*sig);
 		}
 }
@@ -234,6 +233,7 @@ keydown(SDL_Keysym keysym, int repeat)
 	case SDL_SCANCODE_CAPSLOCK:
 	case SDL_SCANCODE_LCTRL:
 	case SDL_SCANCODE_RCTRL: ctrl = 1; return;
+	default: break;
 	}
 	if(keystate[SDL_SCANCODE_LGUI] || keystate[SDL_SCANCODE_RGUI])
 		return;
@@ -281,6 +281,7 @@ keyup(SDL_Keysym keysym)
 	case SDL_SCANCODE_RCTRL: ctrl = 0; return;
 	case SDL_SCANCODE_LALT:
 	case SDL_SCANCODE_RALT: alt = 0; return;
+	default: break;
 	}
 }
 

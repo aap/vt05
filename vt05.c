@@ -105,7 +105,7 @@ blurchar(u32 *dst, u32 *src)
 void
 createfont(void)
 {
-	int i, j;
+	int i;
 	int w, h;
 	u32 *ras1, *ras2;
 	w = TEXW;
@@ -187,7 +187,6 @@ mapchar(char c)
 void
 recvchar(int c)
 {
-	char pc;
 	int x, y;
 
 	/* Handle cursor addresing */
@@ -326,9 +325,8 @@ int
 main(int argc, char *argv[])
 {
 	SDL_Event ev;
-	int mod;
 	int x, y;
-	pthread_t thr1, thr2;
+	pthread_t thr1;
 	struct winsize ws;
 
 	scancodemap = scancodemap_upper;
