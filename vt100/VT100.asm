@@ -357,19 +357,19 @@ X01c3:	lxi	h,X0815
 	ora	a
 	rnz
 	call	X0853
-	lxi	b,X020e
+	lxi	b,X020e         ;b=rts,c=14
 	lxi	h,key_flags
 	mov	a,m
-	ani	10h
+	ani	10h		;control
 	jnz	X0900
 	mov	a,m
-	ani	20h
+	ani	20h		;shift
 	jz	X01e4
-	lxi	b,X00d2
-X01e4:	mvi	a,25h
-	ori	8
+	lxi	b,X00d2         ;c=210
+X01e4:	mvi	a,25h           ;rts+txe+rxe
+	ori	8               ;send break
 	ora	b
-	out	1
+	out	1               ;uart command
 	lda	X207f
 	add	c
 	mov	c,a
@@ -613,7 +613,7 @@ X03ae:	call	X1488
 	ora	a
 	jz	X03ae
 	xra	a
-	sta	X2144
+	sta	key_locked
 	jmp	X03ae
 ;;
 ;;  Receiver interrupt handler
@@ -626,8 +626,8 @@ X03cc:	push	psw
 	jz	X043a
 	mov	c,a
 	lda	X21a5
-	ora	a
-	jnz	X043a
+	ora	a		;; Local mode?
+	jnz	X043a		;; Yes, ignore character.
 	in	1		;; Read from PUSART ctrl
 	ani	38h
 	jz	X03ed
@@ -816,7 +816,7 @@ X054f:	lxi	h,X212c
 	xri	1
 X0569:	mov	m,a
 X056a:	mvi	a,40h
-	sta	X2148
+	sta	key_scan
 	lxi	h,X207f
 	inr	m
 	lda	X21a3
@@ -996,16 +996,16 @@ X06a7:	mov	a,d
 
 X06aa:	lda	key_flags	; A <- [Keys flag buffer]
 	mov	e,a
-	ani	80h		; bit 7 set?
+	ani	80h		; bit 7 set?  signals end of scan
 	rz			; return if not
 	lxi	h,X0841
 	push	h
 	mov	a,e
-	ani	7
+	ani	7               ; number of keys in key_buffer
 	cpi	4
 	jm	X06c2
-	xra	a
-	sta	X2067
+	xra	a               ;overflow
+	sta	X2067           ;clear
 	ret
 
 X06c2:	mov	d,a
@@ -1014,22 +1014,22 @@ X06c2:	mov	d,a
 	lxi	h,key_buffer+4
 X06ca:	mov	a,m
 	ora	a
-	jz	X06e8
+	jz	X06e8           ;zero?
 	push	h
 	push	b
 	mvi	b,3
 	lxi	h,key_buffer
-X06d6:	cmp	m
+X06d6:	cmp	m               ;same key?
 	jz	X06df
 	inx	h
 	dcr	b
 	jp	X06d6
 X06df:	pop	b
 	pop	h
-	jz	X06e7
-	mvi	m,0
+	jz	X06e7           ;same key? cmp above
+	mvi	m,0             ;not same, clear key_buffer+4
 	dcr	c
-X06e7:	inr	c
+X06e7:	inr	c               ;same key
 X06e8:	inx	h
 	dcr	b
 	jnz	X06ca
@@ -1055,7 +1055,7 @@ X0709:	lda	X21a6
 	ani	10h
 	rnz
 	lda	X2150
-	lxi	h,X085f
+	lxi	h,X085f         ;Some special keys: SETUP etc
 	mvi	b,5
 X071b:	cmp	m
 	rz
@@ -1122,7 +1122,7 @@ X0776:	pop	h
 	jz	X022c
 	mov	b,e
 	mov	e,a
-	lda	X2144
+	lda	key_locked
 	ora	a
 	jnz	X0841
 	mov	a,e
@@ -1224,12 +1224,12 @@ X0838:	lda	X2150
 X0841:	xra	a
 	lxi	h,key_flags
 	mov	d,m
-	mov	m,a
+	mov	m,a             ;clear flags
 	inx	h
-	mov	m,d
+	mov	m,d             ;store in key flags "2" X2069
 	inx	h
 	mvi	d,4
-X084c:	mov	m,a
+X084c:	mov	m,a             ;clear key_buffer, 4 bytes
 	inx	h
 	dcr	d
 	jnz	X084c
@@ -1239,13 +1239,16 @@ X0853:	lda	X21a7
 	ani	40h
 	rz
 	mvi	a,80h
-	sta	X2147
+	sta	key_click
 	ret
 
-X085f:	mov	a,e
-	lhld	X3a6a
-	mov	h,h
-	lda	X2130
+X085f:	db      7Bh             ;SETUP
+	db      2Ah             ;ESCAPE
+	db      6Ah             ;NO SCROLL
+	db      3Ah             ;TAB
+	db      64h             ;RETURN
+	
+X0864:  lda     X2130
 	sui	2
 	rnz
 	mov	d,a
@@ -1258,7 +1261,7 @@ X0875:	mov	a,d
 	ora	a
 	cnz	X08a7
 	push	d
-	call	X17be
+	call	X17be		;Display "Wait"
 	pop	d
 	mvi	a,2
 	ana	e
@@ -1339,9 +1342,9 @@ X08fb:	inr	a
 X08fc:	sta	X20fc
 	ret
 
-X0900:	lda	X21a5
+X0900:	lda	X21a5		; control+key
 	ora	a
-	rnz
+	rnz			; return if local mode
 	lhld	X217b
 	mov	a,h
 	cmp	l
@@ -1833,7 +1836,7 @@ X0c11:	mov	l,h
 	ora	a
 	jnz	X0c23
 	mov	a,m
-	ani	0f0h
+	ani	0f0h			;; Clear LEDs?
 	mov	m,a
 	ret
 
@@ -2275,7 +2278,7 @@ X0ec1:	lda	X21a5
 	cpi	5
 	jnc	X0ed2
 	xra	a
-X0ecf:	sta	X2144
+X0ecf:	sta	key_locked
 X0ed2:	mov	a,b
 	ani	80h
 	ral
@@ -2351,7 +2354,7 @@ X0f4e:	lda	X21a5
 	cmp	e
 	mvi	a,0
 	rar
-X0f5b:	sta	X2144
+X0f5b:	sta	key_locked
 X0f5e:	pop	d
 	pop	h
 	ret
@@ -3172,23 +3175,23 @@ X1488:	call	X1493
 X1493:	in	42h		;; Read flags buffer
 	ani	80h		;; check if transmit buffer is empty
 	rz			;; if zero, return
-	lxi	h,X2144		;; HL = 0x2144
+	lxi	h,key_locked	;; HL = 0x2144
 	mov	a,m		;; Load from 2144
 	ora	a		;; Check if zero
 	jz	X14a2		;;
-	mvi	a,10h		;; If not, A = 10 (else A is zero)
+	mvi	a,10h		;; If not, A = 10 (=locked)
 X14a2:	lxi	h,X21a5		;;
-	ora	m		;; or bits from 0x21a5
+	ora	m		;; or bits from 0x21a5 (local mode)
 	lxi	h,X2145		;;
-	ora	m		;; or bits from 0x2145
+	ora	m		;; or bits from 0x2145 (leds?)
 	inx	h		;;
-	ora	m		;; ... and 0x2146
+	ora	m		;; ... and 0x2146 (more leds?)
 	inx	h		;;
-	ora	m		;; ... and 0x2147
-	mvi	m,0		;; zero 0x2147
+	ora	m		;; ... and key_click
+	mvi	m,0		;; zero key_click
 	inx	h		;;
-	ora	m		;; ... and 0x2148
-	mvi	m,0		;; zero 0x2148
+	ora	m		;; ... and key_scan
+	mvi	m,0		;; zero key_scan
 	out	82h		;; Write to keyboard buffer
 	lxi	h,X2074		;;
 	inr	m		;; Increment what's at 0x2074
@@ -4097,7 +4100,7 @@ X1ae8:	mov	a,b
 	xri	20h
 	mov	m,a
 	xra	a
-	sta	X2144
+	sta	key_locked		;; Keyboard not locked
 	ret
 
 	call	X094b
@@ -4150,7 +4153,7 @@ X1b59:	lda	X21be
 	pop	h
 	ret
 
-X1b60:	lda	X2069
+X1b60:	lda	X2069           ;key flags "2"
 	ani	20h
 	rz
 	mov	a,b
@@ -4550,7 +4553,7 @@ X1dff:	ani	3fh
 	ori	0c0h
 X1e03:	sta	X21a4
 	in	42h
-	ani	8
+	ani	8               ;terminal output option?
 	jz	X1e19
 	lxi	h,X21a7
 	mov	a,m
@@ -4885,11 +4888,11 @@ X2131	equ	2131h
 X2140	equ	2140h
 X2142	equ	2142h
 X2143	equ	2143h
-X2144	equ	2144h
+key_locked	equ	2144h
 X2145	equ	2145h
 X2146	equ	2146h
-X2147	equ	2147h
-X2148	equ	2148h
+key_click	equ	2147h
+key_scan	equ	2148h
 X2149	equ	2149h
 X214b	equ	214bh
 X214e	equ	214eh
