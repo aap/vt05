@@ -221,11 +221,16 @@ toggle_fullscreen(void)
 }
 
 void
+sendchar(char c)
+{
+	write(pty, &c, 1);
+}
+
+void
 keydown(SDL_Keysym keysym, int repeat)
 {
 	char *keys;
 	int key;
-	char buf[2];
 
 	switch(keysym.scancode){
 	case SDL_SCANCODE_LSHIFT:
@@ -255,12 +260,10 @@ keydown(SDL_Keysym keysym, int repeat)
 //	printf("%o(%d %d) %c\n", key, shift, ctrl, key);
 
 	if(alt){
-		buf[0] = '\033';
-		buf[1] = key;
-		write(pty, buf, 2);
+		sendchar('\033');
+		sendchar(key);
 	}else{
-		buf[0] = key;
-		write(pty, buf, 1);
+		sendchar(key);
 	}
 
 /*	// local echo for testing

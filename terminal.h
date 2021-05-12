@@ -28,6 +28,7 @@ void keyup(SDL_Keysym keysym);
 void keydown(SDL_Keysym keysym, int repeat);
 void draw(void);
 void recvchar(int c);
+void sendchar(char c);
 void shell(void);
 void spawn(void);
 void mkpty(struct winsize *ws, int th, int tw, int fw, int fh);
