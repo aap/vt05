@@ -289,6 +289,21 @@ keyup(SDL_Keysym keysym)
 }
 
 int baud;
+static SDL_bool data_terminal_ready = 0;
+static SDL_mutex *dtr_lock = NULL;
+static SDL_cond *dtr_cond;
+
+void
+set_dtr(SDL_bool dtr)
+{
+	if (dtr_lock == NULL)
+		return;
+	SDL_LockMutex (dtr_lock);
+	data_terminal_ready = dtr;
+	if (dtr)
+	  SDL_CondSignal(dtr_cond);
+	SDL_UnlockMutex (dtr_lock);
+}
 
 void*
 readthread(void *p)
@@ -297,6 +312,9 @@ readthread(void *p)
 	SDL_Event ev;
 	static struct timespec slp;
 
+	dtr_lock = SDL_CreateMutex();
+	dtr_cond = SDL_CreateCond();
+
 	SDL_memset(&ev, 0, sizeof(SDL_Event));
 	ev.type = userevent;
 
@@ -304,6 +322,11 @@ readthread(void *p)
 		slp.tv_nsec = 1000*1000*1000 / (baud/11);
 
 	while(1){
+		SDL_LockMutex(dtr_lock);
+		while(!data_terminal_ready)
+			SDL_CondWait(dtr_cond, dtr_lock);
+		SDL_UnlockMutex(dtr_lock);
+	  
 		if(read(pty, &c, 1) < 0){
 			if(rerun){
 				sleep(2);

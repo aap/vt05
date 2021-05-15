@@ -27,6 +27,7 @@ void* readthread(void *p);
 void keyup(SDL_Keysym keysym);
 void keydown(SDL_Keysym keysym, int repeat);
 void draw(void);
+void set_dtr(SDL_bool dtr);
 void recvchar(int c);
 void sendchar(char c);
 void shell(void);
