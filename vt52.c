@@ -143,12 +143,15 @@ draw(void)
 		for(x = 0; x < TERMWIDTH; x++)
 			for(y = 0; y < TERMHEIGHT; y++){
 				c = fb[y][x];
-				if(blink && x == curx && y == cury)
-					c = 2;
 				if(c < 128){
 					r.x = (2 + x*(CWIDTH+HSPACE)) - BLURRADIUS;
 					r.y = (2 + y*(CHEIGHT+VSPACE))*2 - BLURRADIUS;
 					SDL_RenderCopy(renderer, fonttex[c], nil, &r);
+				}
+				if(blink && x == curx && y == cury){
+					r.x = (2 + x*(CWIDTH+HSPACE)) - BLURRADIUS;
+					r.y = (2 + y*(CHEIGHT+VSPACE)+2)*2 - BLURRADIUS;
+					SDL_RenderCopy(renderer, fonttex[0137], nil, &r);
 				}
 			}
 		SDL_SetRenderTarget(renderer, nil);
@@ -205,7 +208,7 @@ recvchar(int c)
 	}else if(cad == 2){
 		if(cady >= 0 && cady < TERMHEIGHT)
 			cury = cady;
-		curx = c - ' ';;
+		curx = c - ' ';
 		cad = 0;
 		return;
 	}
