@@ -18,27 +18,27 @@
 #include <pthread.h>
 #include <SDL.h>
 #include <assert.h>
-#include <math.h>
 
 #include "terminal.h"
 #include "args.h"
 
-Col phos1 = { 0xFF, 0x9F, 0xFF, 0x47 };
-Col phos2 = { 0xFF, 0x68, 0xCC, 0x0C };
+Col phos1 = { 0xFF, 0xFF, 0xFF, 0xFF };
+Col phos2 = { 0xFF, 0xFF, 0xB0, 0x40 };
 float Gamma = 1.0/2.2f;
 
-#include "dmchars.h"
+
+#include "vt50rom.h"
 
 #define TERMWIDTH 80
-#define TERMHEIGHT 24
+#define TERMHEIGHT 12
 
-#define HSPACE 2
-#define VSPACE 5
+#define CWIDTH 9	// original: 1 blank, 5 rom, 4 blank, we do 2 5 3
+#define CHEIGHT 10	// 8 rom, 2 blank
 
-#define FBWIDTH (TERMWIDTH*(CWIDTH+HSPACE)+2*2)
-#define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
+#define FBWIDTH (TERMWIDTH*CWIDTH+2*2)
+#define FBHEIGHT (TERMHEIGHT*2*CHEIGHT+2*2)
 
-#define WIDTH  (2*FBWIDTH)
+#define WIDTH  (FBWIDTH)
 #define HEIGHT (2*FBHEIGHT)
 
 SDL_Surface *screen;
@@ -52,35 +52,47 @@ u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
 int blink;
-int arrows = 0;
-int rerun = 0;
 int scale = 1;
 int full = 0;
 
-SDL_Texture *fonttex[129];
+SDL_Texture *fonttex[64];
+SDL_Texture *cursortex;
 
 int pty;
 
-#define TEXW ((CWIDTH*2 + BLURRADIUS*2))
+#define TEXW ((CWIDTH + BLURRADIUS*2))
 #define TEXH ((CHEIGHT*2 + BLURRADIUS*2))
+
+void
+createcursor(u32 *raster)
+{
+	int j;
+
+	memset(raster, 0, TEXW*TEXH*sizeof(u32));
+	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
+
+	for(j = 0; j < 9; j++){
+		raster[(8*2+0)*TEXW + j] = 0xFFFFFFFF;
+	// uncomment to disable scanlines
+		//raster[(8*2+1)*TEXW + j] = 0xFFFFFFFF;
+	}
+}
 
 void
 createchar(u32 *raster, int c)
 {
 	int i, j;
-	char *chr = font[c];
+	u8 *chr = &vt50rom[c*8];
 
 	memset(raster, 0, TEXW*TEXH*sizeof(u32));
 	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
 
-	for(i = 0; i < CHEIGHT; i++){
-		for(j = 0; j < CWIDTH; j++){
-			if(chr[i*CWIDTH+j] == '*'){
-				raster[(i*2+0)*TEXW + j*2] = 0xFF;
-				raster[(i*2+0)*TEXW + j*2+1] = 0xFF;
+	for(i = 0; i < 8; i++){
+		for(j = 0; j < 5; j++){
+			if(chr[i]&(020>>j)){
+				raster[(i*2+0)*TEXW + j+1] = 0xFFFFFFFF;
 			// uncomment to disable scanlines
-			//	raster[(i*2+1)*TEXW + j*2] = 0xFF;
-			//	raster[(i*2+1)*TEXW + j*2+1] = 0xFF;
+				//raster[(i*2+1)*TEXW + j+1] = 0xFFFFFFFF;
 			}
 		}
 	}
@@ -113,16 +125,22 @@ createfont(void)
 	h = TEXH;
 	ras1 = malloc(w*h*sizeof(u32));
 	ras2 = malloc(w*h*sizeof(u32));
-	for(i = 0; i < 129; i++){
+	for(i = 0; i < 64; i++){
 		createchar(ras1, i);
 		blurchar(ras2, ras1);
-
 
 		fonttex[i] = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_STREAMING, w, h);
 		SDL_SetTextureBlendMode(fonttex[i], SDL_BLENDMODE_ADD);
 		SDL_UpdateTexture(fonttex[i], nil, ras2, w*sizeof(u32));
 	}
+	createcursor(ras1);
+	blurchar(ras2, ras1);
+
+	cursortex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+		SDL_TEXTUREACCESS_STREAMING, w, h);
+	SDL_SetTextureBlendMode(cursortex, SDL_BLENDMODE_ADD);
+	SDL_UpdateTexture(cursortex, nil, ras2, w*sizeof(u32));
 }
 
 void
@@ -144,11 +162,16 @@ draw(void)
 		for(x = 0; x < TERMWIDTH; x++)
 			for(y = 0; y < TERMHEIGHT; y++){
 				c = fb[y][x];
-				if(blink && x == curx && y == cury)
-					c = 0200;
-				r.x = (2 + x*(CWIDTH+HSPACE))*2 - BLURRADIUS;
-				r.y = (2 + y*(CHEIGHT+VSPACE))*2 - BLURRADIUS;
-				SDL_RenderCopy(renderer, fonttex[c], nil, &r);
+				if(c < 128){
+					r.x = (2 + x*CWIDTH) - BLURRADIUS;
+					r.y = (2 + y*2*CHEIGHT + CHEIGHT/2)*2 - BLURRADIUS;
+					SDL_RenderCopy(renderer, fonttex[c-040], nil, &r);
+				}
+				if(blink && x == curx && y == cury){
+					r.x = (2 + x*CWIDTH) - BLURRADIUS;
+					r.y = (2 + y*2*CHEIGHT + CHEIGHT/2)*2 - BLURRADIUS;
+					SDL_RenderCopy(renderer, cursortex, nil, &r);
+				}
 			}
 		SDL_SetRenderTarget(renderer, nil);
 		updatescreen = 1;
@@ -172,132 +195,145 @@ scroll(void)
 }
 
 void
+scrollup(void)
+{
+	int x, y;
+	for(y = TERMHEIGHT-1; y > 0; y--)
+		for(x = 0; x < TERMWIDTH; x++) 
+			fb[y][x] = fb[y-1][x];
+	for(x = 0; x < TERMWIDTH; x++) 
+		fb[0][x] = ' ';
+}
+
+int esc;
+int cad, cady;
+int hold;
+int rerun = 0;
+
+/* TODO: implement hold mode */
+
+char
+mapchar(char c)
+{
+	c &= 0177;
+	if(c >= '@')
+		c &= ~040;
+	return c;
+}
+
+void
 recvchar(int c)
 {
-	static int last_cr = 0;
-	static int roll_mode = 0;
-	static int insdel_mode = 0;
-
 	int x, y;
 
-	if(c >= 040 && c < 0177)
-	  fprintf(stderr, "%c", c);
-	else
-	  fprintf(stderr, "[%c/%o]", c, c);
+	/* Handle cursor addresing */
+	if(cad == 1){
+		cady = c-' ';
+		cad = 2;
+		return;
+	}else if(cad == 2){
+		if(cady >= 0 && cady < TERMHEIGHT)
+			cury = cady;
+		else
+			cury = 11;
+		// TODO: what if c < ' '?
+		curx = c - ' ';
+		cad = 0;
+		return;
+	}
 
-	switch(c){
-	case 000:
-	case 0177:
-		break;
+	if(esc){
+		switch(c){
+		case 'A':
+			cury--;
+			break;
+		case 'B':
+			cury++;		// VT50H only
+			break;
+		case 'C':
+			curx++;
+			break;
+		case 'D':
+			curx--;
+			break;
+
+		case 'H':
+			curx = 0;
+			cury = 0;
+			break;
+
+		case 'K':
+			for(x = curx; x < TERMWIDTH; x++)
+				fb[cury][x] = ' ';
+			break;
+		case 'J':
+			for(x = curx; x < TERMWIDTH; x++)
+				fb[cury][x] = ' ';
+			for(y = cury+1; y < TERMHEIGHT; y++)
+				for(x = 0; x < TERMWIDTH; x++)
+					fb[y][x] = ' ';
+			break;
+
+		case 'Y':
+			cad = 1;	// VT50H only
+			break;
+
+		case 'Z':
+			write(pty, "\033/H", 3);	// identify as VT50H
+			break;
+
+		case '[':
+			hold = 1;
+			break;
+		case '\\':
+			hold = 0;
+			break;
+		}
+		esc = 0;
+	}else if(c >= 040){
+		if(c != 0177)
+			fb[cury][curx++] = mapchar(c);
+	}else switch(c){
 	case 007:	/* BEL */
 		/* TODO: feep */
 		break;
-	case 010:	/* BS - ^H */
-		if (insdel_mode) {
-			memmove(&fb[cury][curx], &fb[cury][curx+1], TERMWIDTH-curx-1);
-			fb[cury][TERMWIDTH-1] = ' ';
-		} else
-			curx--;
-		break;
 	case 011:	/* HT */
-		curx = curx+8 & ~7;
+		if(curx >= 72)
+			curx++;
+		else
+			curx = curx+8 & ~7;
 		break;
-	case 014:	/* FF ^L */
-		read(pty, &c, 1);
-		fprintf(stderr, "[%o]", c);
-		curx = c ^ 0140;
-		read(pty, &c, 1);
-		fprintf(stderr, "[%o]", c);
-		cury = c ^ 0140;
-		fprintf(stderr, "{%d,%d}", curx, cury);
+	case 012:	/* LF */
+		cury++;
+		if(cury >= TERMHEIGHT)
+			scroll();
 		break;
 	case 015:	/* CR */
 		curx = 0;
-		/* Fall through. */
-	case 012:	/* LF */
-	LF:
-		if (insdel_mode) {
-			memmove(&fb[cury+1][0], &fb[cury][0], TERMWIDTH*(TERMHEIGHT-cury-1));
-			for(x = 0; x < TERMWIDTH; x++) 
-				fb[cury][x] = ' ';
-			break;
-		}
-		if(last_cr)
-			break;
-		cury++;
 		break;
-#if 0
-	case 013:	/* VT */
-		for(x = curx; x < TERMWIDTH; x++)
-			fb[cury][x] = ' ';
-		for(y = cury+1; y < TERMHEIGHT; y++)
-			for(x = 0; x < TERMWIDTH; x++)
-				fb[y][x] = ' ';
+
+	case 016:	/* SO */
+		cad = 1;	// VT50H only
 		break;
-#endif
-	case 027:	/* ^W */
-		for(x = curx; x < TERMWIDTH; x++)
-			fb[cury][x] = ' ';
+
+	case 010:	/* BS - ^H */
+		curx--;
 		break;
-	case 031:	/* ^_ */
-	case 036:	/* ^^ */
-		for(x = 0; x < TERMWIDTH; x++)
-			for(y = 0; y < TERMHEIGHT; y++)
-				fb[y][x] = ' ';
-		/* Fall through. */
-	case 002:	/* ^B */
-		curx = cury = 0;
+
+	case 033:
+		esc = 1;
 		break;
-	case 020:	/* ^P */
-		fprintf(stderr, "[INSERT/DELETE]");
-		insdel_mode = 1;
-		break;
-	case 030:	/* CAN ^X */
-		roll_mode = 0;
-		insdel_mode = 0;
-		break;
-	case 032:	/* ^Z */
-		if (insdel_mode) {
-			memmove(&fb[cury][0], &fb[cury+1][0], TERMWIDTH*(TERMHEIGHT-cury-1));
-			for(x = 0; x < TERMWIDTH; x++) 
-				fb[TERMHEIGHT-1][x] = ' ';
-		} else
-			cury--;
-		break;
-	case 034:	/* FS ^\ */
-		if (insdel_mode) {
-			memmove(&fb[cury][curx+1], &fb[cury][curx], TERMWIDTH-curx-1);
-			fb[cury][curx] = ' ';
-		} else
-			curx++;
-		break;
-	case 035:	/* ^] */
-		roll_mode = 1;
-		break;
-	default:
-		if (insdel_mode)
-			memmove(&fb[cury][curx+1], &fb[cury][curx], TERMWIDTH-curx-1);
-		fb[cury][curx++] = c;
-		break;
+
 	}
-	last_cr = (c == 015);
 
 	if(curx < 0)
 		curx = 0;
-	if(curx >= TERMWIDTH){
-		curx = 0;
-		goto LF;
-	}
+	if(curx >= TERMWIDTH)
+		curx = TERMWIDTH-1;
 	if(cury < 0)
 		cury = 0;
-	if(cury >= TERMHEIGHT) {
-		if(roll_mode) {
-			scroll();
-			cury = TERMHEIGHT - 1;
-		} else {
-			cury = 0;
-		}
-	}
+	if(cury >= TERMHEIGHT)
+		cury = TERMHEIGHT-1;
 
 	updatebuf = 1;
 }
@@ -308,7 +344,7 @@ timethread(void *arg)
 	(void)arg;
 	SDL_Event ev;
 	memset(&ev, 0, sizeof(ev));
-
+	ev.type = userevent;
 	struct timespec slp = { 0, 1000*1000*1000/3.75f };
 	for(;;){
 		blink = !blink;
@@ -318,14 +354,14 @@ timethread(void *arg)
 	}
 }
 
-char TERM[] = "dumb";
+char TERM[] = "vt52";
 char *argv0;
 char *name;
 
 void
 usage(void)
 {
-	panic("usage: %s [-2] [-B] [-f] [-b baudrate] command...", argv0);
+	panic("usage: %s [-B] [-r] [-2] [-f] [-b baudrate] command...", argv0);
 }
 
 int
@@ -336,7 +372,7 @@ main(int argc, char *argv[])
 	pthread_t thr1, thr2;
 	struct winsize ws;
 
-	scancodemap = scancodemap_both;
+	scancodemap = scancodemap_upper;
 
 	ARGBEGIN{
 	case 'b':
@@ -360,7 +396,7 @@ main(int argc, char *argv[])
 		break;
 	}ARGEND;
 
-	if(argc == 0)
+	if (argc == 0)
 		usage();
 
 	cmd = &argv[0];
@@ -368,7 +404,7 @@ main(int argc, char *argv[])
 	mkpty(&ws, TERMHEIGHT, TERMWIDTH, FBWIDTH, FBHEIGHT);
 	spawn();
 
-	mkwindow(&window, &renderer, "Datamedial Elite 2500", WIDTH*scale, HEIGHT*scale);
+	mkwindow(&window, &renderer, "VT50", WIDTH*scale, HEIGHT*scale);
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
@@ -380,7 +416,7 @@ main(int argc, char *argv[])
 	for(x = 0; x < TERMWIDTH; x++)
 		for(y = 0; y < TERMHEIGHT; y++)
 			fb[y][x] = ' ';
-	initblur(1.5);
+	initblur(1.3);
 	createfont();
 
 	pthread_create(&thr1, NULL, readthread, NULL);

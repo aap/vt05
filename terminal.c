@@ -9,6 +9,9 @@
 
 /* Common code for all terminals */
 
+char **cmd;
+extern char TERM[];
+
 void
 panic(char *fmt, ...)
 {
@@ -318,6 +321,15 @@ readthread(void *p)
 			nanosleep(&slp, NULL);
 	}
 }
+
+void
+shell(void)
+{
+	setenv("TERM", TERM, 1);
+	execvp(cmd[0], cmd);
+	exit(1);
+}
+
 
 void spawn(void)
 {

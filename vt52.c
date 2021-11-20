@@ -32,14 +32,11 @@ float Gamma = 1.0/2.2f;
 #define TERMWIDTH 80
 #define TERMHEIGHT 24
 
-#define CWIDTH 8	// 7 bits + dot stretching
-#define CHEIGHT 8
+#define CWIDTH 9	// original: 1 blank, 5 rom, 4 blank, we do 2 5 3
+#define CHEIGHT 10	// 8 rom, 2 blank (3 for 50hz)
 
-#define VSPACE 2
-#define HSPACE 2
-
-#define FBWIDTH (TERMWIDTH*(CWIDTH+HSPACE)+2*2)
-#define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
+#define FBWIDTH (TERMWIDTH*CWIDTH+2*2)
+#define FBHEIGHT (TERMHEIGHT*CHEIGHT+2*2)
 
 #define WIDTH  (FBWIDTH)
 #define HEIGHT (2*FBHEIGHT)
@@ -59,11 +56,27 @@ int scale = 1;
 int full = 0;
 
 SDL_Texture *fonttex[128];
+SDL_Texture *cursortex;
 
 int pty;
 
 #define TEXW ((CWIDTH + BLURRADIUS*2))
 #define TEXH ((CHEIGHT*2 + BLURRADIUS*2))
+
+void
+createcursor(u32 *raster)
+{
+	int j;
+
+	memset(raster, 0, TEXW*TEXH*sizeof(u32));
+	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
+
+	for(j = 0; j < 9; j++){
+		raster[(8*2+0)*TEXW + j] = 0xFFFFFFFF;
+	// uncomment to disable scanlines
+		//raster[(8*2+1)*TEXW + j] = 0xFFFFFFFF;
+	}
+}
 
 void
 createchar(u32 *raster, int c)
@@ -74,9 +87,9 @@ createchar(u32 *raster, int c)
 	memset(raster, 0, TEXW*TEXH*sizeof(u32));
 	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
 
-	for(i = 0; i < CHEIGHT; i++){
-		for(j = 0; j < 8; j++){
-			if(chr[i]&(0300>>j)){
+	for(i = 0; i < 8; i++){
+		for(j = 0; j < 7; j++){
+			if(chr[i]&(0100>>j)){
 				raster[(i*2+0)*TEXW + j] = 0xFF;
 			// uncomment to disable scanlines
 			//	raster[(i*2+1)*TEXW + j] = 0xFF;
@@ -116,12 +129,18 @@ createfont(void)
 		createchar(ras1, i);
 		blurchar(ras2, ras1);
 
-
 		fonttex[i] = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_STREAMING, w, h);
 		SDL_SetTextureBlendMode(fonttex[i], SDL_BLENDMODE_ADD);
 		SDL_UpdateTexture(fonttex[i], nil, ras2, w*sizeof(u32));
 	}
+	createcursor(ras1);
+	blurchar(ras2, ras1);
+
+	cursortex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+		SDL_TEXTUREACCESS_STREAMING, w, h);
+	SDL_SetTextureBlendMode(cursortex, SDL_BLENDMODE_ADD);
+	SDL_UpdateTexture(cursortex, nil, ras2, w*sizeof(u32));
 }
 
 void
@@ -144,14 +163,14 @@ draw(void)
 			for(y = 0; y < TERMHEIGHT; y++){
 				c = fb[y][x];
 				if(c < 128){
-					r.x = (2 + x*(CWIDTH+HSPACE)) - BLURRADIUS;
-					r.y = (2 + y*(CHEIGHT+VSPACE))*2 - BLURRADIUS;
+					r.x = (2 + x*CWIDTH) - BLURRADIUS;
+					r.y = (2 + y*CHEIGHT)*2 - BLURRADIUS;
 					SDL_RenderCopy(renderer, fonttex[c], nil, &r);
 				}
 				if(blink && x == curx && y == cury){
-					r.x = (2 + x*(CWIDTH+HSPACE)) - BLURRADIUS;
-					r.y = (2 + y*(CHEIGHT+VSPACE)+2)*2 - BLURRADIUS;
-					SDL_RenderCopy(renderer, fonttex[0137], nil, &r);
+					r.x = (2 + x*CWIDTH) - BLURRADIUS;
+					r.y = (2 + y*CHEIGHT)*2 - BLURRADIUS;
+					SDL_RenderCopy(renderer, cursortex, nil, &r);
 				}
 			}
 		SDL_SetRenderTarget(renderer, nil);
@@ -208,6 +227,7 @@ recvchar(int c)
 	}else if(cad == 2){
 		if(cady >= 0 && cady < TERMHEIGHT)
 			cury = cady;
+		// TODO: what if c < ' '?
 		curx = c - ' ';
 		cad = 0;
 		return;
@@ -345,20 +365,7 @@ timethread(void *arg)
 	}
 }
 
-char **cmd;
-
-void
-shell(void)
-{
-	setenv("TERM", "dumb", 1);
-
-	//execl("/usr/bin/telnet", "telnet", "localhost", "10002", nil);
-	execv("/usr/bin/telnet", cmd);
-
-	exit(1);
-}
-
-
+char TERM[] = "vt52";
 char *argv0;
 char *name;
 
@@ -408,7 +415,7 @@ main(int argc, char *argv[])
 	mkpty(&ws, TERMHEIGHT, TERMWIDTH, FBWIDTH, FBHEIGHT);
 	spawn();
 
-	mkwindow(&window, &renderer, "Datapoint 3300", WIDTH*scale, HEIGHT*scale);
+	mkwindow(&window, &renderer, "VT52", WIDTH*scale, HEIGHT*scale);
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);

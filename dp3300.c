@@ -282,20 +282,7 @@ timethread(void *arg)
 	}
 }
 
-char **cmd;
-
-void
-shell(void)
-{
-	setenv("TERM", "dumb", 1);
-
-	//execl("/usr/bin/telnet", "telnet", "localhost", "10002", nil);
-	execv("/usr/bin/telnet", cmd);
-
-	exit(1);
-}
-
-
+char TERM[] = "dumb";
 char *argv0;
 char *name;
 

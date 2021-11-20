@@ -52,6 +52,7 @@ u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
 int rerun = 0;
+int blink;
 int scale = 1;
 int full = 0;
 
@@ -149,9 +150,11 @@ draw(void)
 					SDL_RenderCopy(renderer, fonttex[c-' '], nil, &r);
 				}
 			}
-		r.x = (2 + curx*(CWIDTH+HSPACE))*2 - BLURRADIUS;
-		r.y = (2 + cury*(CHEIGHT+VSPACE))*2 - BLURRADIUS + 4;
-		SDL_RenderCopy(renderer, fonttex['_'-' '], nil, &r);
+		if(blink){
+			r.x = (2 + curx*(CWIDTH+HSPACE))*2 - BLURRADIUS;
+			r.y = (2 + cury*(CHEIGHT+VSPACE)+1)*2 - BLURRADIUS;
+			SDL_RenderCopy(renderer, fonttex['_'-' '], nil, &r);
+		}
 		SDL_SetRenderTarget(renderer, nil);
 		updatescreen = 1;
 	}
@@ -281,7 +284,6 @@ recvchar(int c)
 	updatebuf = 1;
 }
 
-#if 0
 void*
 timethread(void *arg)
 {
@@ -289,29 +291,17 @@ timethread(void *arg)
 	SDL_Event ev;
 	memset(&ev, 0, sizeof(ev));
 	ev.type = userevent;
-	struct timespec slp = { 0, 30*1000*1000 };
+	struct timespec slp = { 0, 1000*1000*1000/3.75f };
 	for(;;){
+		blink = !blink;
+		updatebuf = 1;
 		nanosleep(&slp, nil);
 		SDL_PushEvent(&ev);
 	}
 }
-#endif
-
-char **cmd;
-
-void
-shell(void)
-{
-	setenv("TERM", "dumb", 1);
-
-	//execl("/bin/cat", "cat", nil);
-	//execl("/usr/bin/telnet", "telnet", "localhost", "10002", nil);
-	execv("/usr/bin/telnet", cmd);
-
-	exit(1);
-}
 
 
+char TERM[] = "dumb";
 char *argv0;
 char *name;
 
@@ -326,7 +316,7 @@ main(int argc, char *argv[])
 {
 	SDL_Event ev;
 	int x, y;
-	pthread_t thr1;
+	pthread_t thr1, thr2;
 	struct winsize ws;
 
 	scancodemap = scancodemap_upper;
@@ -378,7 +368,7 @@ main(int argc, char *argv[])
 	createfont();
 
 	pthread_create(&thr1, NULL, readthread, NULL);
-//	pthread_create(&thr2, nil, timethread, nil);
+	pthread_create(&thr2, nil, timethread, nil);
 
 	if(full)
 		toggle_fullscreen();

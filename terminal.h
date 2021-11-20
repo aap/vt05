@@ -35,6 +35,7 @@ void mkwindow(SDL_Window **window, SDL_Renderer **renderer,
 	      char *title, int width, int height);
 void toggle_fullscreen(void);
 
+extern char **cmd;	// the command to run
 extern int baud;
 extern int rerun;
 extern char **scancodemap;
