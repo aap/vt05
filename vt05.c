@@ -27,11 +27,11 @@
 #define TERMWIDTH 72
 #define TERMHEIGHT 20
 
-#define HSPACE 2
-#define VSPACE 7
+#define CWIDTH 7	// 5 rom, 2 blank
+#define CHEIGHT 14	// 7 rom, 7 blank
 
-#define FBWIDTH (TERMWIDTH*(CWIDTH+HSPACE)+2*2)
-#define FBHEIGHT (TERMHEIGHT*(CHEIGHT+VSPACE)+2*2)
+#define FBWIDTH (TERMWIDTH*CWIDTH+2*2)
+#define FBHEIGHT (TERMHEIGHT*CHEIGHT+2*2)
 
 #define WIDTH  (2*FBWIDTH)
 #define HEIGHT (2*FBHEIGHT)
@@ -57,7 +57,7 @@ int scale = 1;
 int full = 0;
 
 SDL_Texture *fonttex[64];
-
+SDL_Texture *cursortex;
 
 int pty;
 
@@ -65,17 +65,34 @@ int pty;
 #define TEXH ((CHEIGHT*2 + BLURRADIUS*2))
 
 void
-createchar(u32 *raster, int c)
+createcursor(u32 *raster)
 {
-	int i, j;
-	char *chr = font[c + ' '];
+	int j;
 
 	memset(raster, 0, TEXW*TEXH*sizeof(u32));
 	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
 
-	for(i = 0; i < CHEIGHT; i++){
-		for(j = 0; j < CWIDTH; j++){
-			if(chr[i*CWIDTH+j] == '*'){
+	for(j = 0; j < 7; j++){
+		raster[(8*2+0)*TEXW + j*2] = 0xFFFFFFFF;
+		raster[(8*2+0)*TEXW + j*2+1] = 0xFFFFFFFF;
+	// uncomment to disable scanlines
+		//raster[(8*2+1)*TEXW + j*2] = 0xFFFFFFFF;
+		//raster[(8*2+1)*TEXW + j*2+1] = 0xFFFFFFFF;
+	}
+}
+
+void
+createchar(u32 *raster, int c)
+{
+	int i, j;
+	char *chr = font[c];
+
+	memset(raster, 0, TEXW*TEXH*sizeof(u32));
+	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
+
+	for(i = 0; i < 7; i++){
+		for(j = 0; j < 5; j++){
+			if(chr[i*5+j] == '*'){
 				raster[(i*2+0)*TEXW + j*2] = 0xFF;
 				raster[(i*2+0)*TEXW + j*2+1] = 0xFF;
 			// uncomment to disable scanlines
@@ -123,6 +140,13 @@ createfont(void)
 		SDL_SetTextureBlendMode(fonttex[i], SDL_BLENDMODE_ADD);
 		SDL_UpdateTexture(fonttex[i], nil, ras2, w*sizeof(u32));
 	}
+	createcursor(ras1);
+	blurchar(ras2, ras1);
+
+	cursortex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+		SDL_TEXTUREACCESS_STREAMING, w, h);
+	SDL_SetTextureBlendMode(cursortex, SDL_BLENDMODE_ADD);
+	SDL_UpdateTexture(cursortex, nil, ras2, w*sizeof(u32));
 }
 
 void
@@ -145,15 +169,15 @@ draw(void)
 			for(y = 0; y < TERMHEIGHT; y++){
 				c = fb[y][x];
 				if(c >= ' '){
-					r.x = (2 + x*(CWIDTH+HSPACE))*2 - BLURRADIUS;
-					r.y = (2 + y*(CHEIGHT+VSPACE))*2 - BLURRADIUS;
+					r.x = (2 + x*CWIDTH)*2 - BLURRADIUS;
+					r.y = (2 + y*CHEIGHT)*2 - BLURRADIUS;
 					SDL_RenderCopy(renderer, fonttex[c-' '], nil, &r);
 				}
 			}
 		if(blink){
-			r.x = (2 + curx*(CWIDTH+HSPACE))*2 - BLURRADIUS;
-			r.y = (2 + cury*(CHEIGHT+VSPACE)+1)*2 - BLURRADIUS;
-			SDL_RenderCopy(renderer, fonttex['_'-' '], nil, &r);
+			r.x = (2 + curx*CWIDTH)*2 - BLURRADIUS;
+			r.y = (2 + cury*CHEIGHT)*2 - BLURRADIUS;
+			SDL_RenderCopy(renderer, cursortex, nil, &r);
 		}
 		SDL_SetRenderTarget(renderer, nil);
 		updatescreen = 1;
