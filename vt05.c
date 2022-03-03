@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 600
 #define _DEFAULT_SOURCE
 
+#include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -16,7 +17,6 @@
 #include <poll.h>
 #include <errno.h>
 #include <pthread.h>
-#include <SDL.h>
 #include <assert.h>
 
 #include "terminal.h"
