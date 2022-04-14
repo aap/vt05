@@ -309,7 +309,9 @@ readthread(void *p)
 				sleep(2);
 				spawn();
 			}else{
-				exit(0);
+				ev.type = SDL_QUIT;
+				SDL_PushEvent(&ev);
+				return nil;
 			}
 		}
 		recvchar(c);
