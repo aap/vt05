@@ -53,7 +53,6 @@ u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
 int blink;
-int arrows = 0;
 int rerun = 0;
 int scale = 1;
 int full = 0;
@@ -70,13 +69,6 @@ createchar(u32 *raster, int c)
 {
 	int i, j;
 	char *chr = font[c + ' '];
-
-	if (arrows) {
-		if (c == '^' - ' ')
-			chr = font[0141];
-		else if (c == '_' - ' ')
-			chr = font[0142];
-	}
 
 	memset(raster, 0, TEXW*TEXH*sizeof(u32));
 	raster = &raster[BLURRADIUS*TEXW + BLURRADIUS];
@@ -304,7 +296,7 @@ main(int argc, char *argv[])
 
 	ARGBEGIN{
 	case 'a':
-		arrows = 1;
+		font = font_tms4151;
 		break;
 	case 'b':
 		baud = atoi(EARGF(usage()));
