@@ -59,7 +59,7 @@ int scale = 1;
 int full = 0;
 
 SDL_Texture *fonttex[65];
-
+char **font = font_tms4100;
 int pty;
 
 #define TEXW ((CWIDTH*2 + BLURRADIUS*2))

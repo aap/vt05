@@ -12,7 +12,7 @@
 	"     "\
 	"     "
 
-char *font[] = {
+char *font_tms4100[] = {
 	/* 00 */
 	EMPTY,
 
