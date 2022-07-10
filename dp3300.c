@@ -58,7 +58,7 @@ int scale = 1;
 int full = 0;
 
 SDL_Texture *fonttex[65];
-char **font = font_tms4100;
+char **font = font_tms4151;
 int pty;
 
 #define TEXW ((CWIDTH*2 + BLURRADIUS*2))
@@ -296,7 +296,7 @@ main(int argc, char *argv[])
 
 	ARGBEGIN{
 	case 'a':
-		font = font_tms4151;
+		font = font_tms4100;
 		break;
 	case 'b':
 		baud = atoi(EARGF(usage()));
