@@ -148,6 +148,11 @@ char *scancodemap_both[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_PERIOD] = ".>",
 	[SDL_SCANCODE_SLASH] = "/?",
 	[SDL_SCANCODE_SPACE] = "  ",
+
+	[SDL_SCANCODE_UP] = "\020\020",    //Emacs ^P
+	[SDL_SCANCODE_DOWN] = "\016\016",  //Emacs ^N
+	[SDL_SCANCODE_LEFT] = "\002\002",  //Emacs ^B
+	[SDL_SCANCODE_RIGHT] = "\006\006", //Emacs ^F
 };
 
 char *scancodemap_upper[SDL_NUM_SCANCODES] = {
@@ -208,6 +213,11 @@ char *scancodemap_upper[SDL_NUM_SCANCODES] = {
 	[SDL_SCANCODE_PERIOD] = ".>",
 	[SDL_SCANCODE_SLASH] = "/?",
 	[SDL_SCANCODE_SPACE] = "  ",
+
+	[SDL_SCANCODE_UP] = "\020\020",    //Emacs ^P
+	[SDL_SCANCODE_DOWN] = "\016\016",  //Emacs ^N
+	[SDL_SCANCODE_LEFT] = "\002\002",  //Emacs ^B
+	[SDL_SCANCODE_RIGHT] = "\006\006", //Emacs ^F
 };
 
 int ctrl;
