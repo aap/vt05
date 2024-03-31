@@ -294,11 +294,7 @@ void*
 readthread(void *p)
 {
 	char c;
-	SDL_Event ev;
 	static struct timespec slp;
-
-	SDL_memset(&ev, 0, sizeof(SDL_Event));
-	ev.type = userevent;
 
 	if(baud)
 		slp.tv_nsec = 1000*1000*1000 / (baud/11);
@@ -309,18 +305,14 @@ readthread(void *p)
 				sleep(2);
 				spawn();
 			}else{
-				ev.type = SDL_QUIT;
-				SDL_PushEvent(&ev);
 				return nil;
 			}
 		}
 		recvchar(c);
 
-		SDL_PushEvent(&ev);
-
 		/* simulate baudrate */
 		if(baud)
-			nanosleep(&slp, NULL);
+			nanosleep(&slp, nil);
 	}
 }
 
@@ -384,4 +376,46 @@ void mkwindow(SDL_Window **window, SDL_Renderer **renderer,
 
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	SDL_SetHint("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
+}
+
+void
+mainloop(void)
+{
+	SDL_Event ev;
+	int running = 1;
+	while(running){
+		while(SDL_PollEvent(&ev)) {
+			switch(ev.type) {
+			case SDL_QUIT:
+				running = 0;
+				break;
+
+			case SDL_KEYDOWN:
+				keydown(ev.key.keysym, ev.key.repeat);
+				break;
+			case SDL_KEYUP:
+				keyup(ev.key.keysym);
+				break;
+
+			case SDL_WINDOWEVENT:
+				switch(ev.window.event) {
+				case SDL_WINDOWEVENT_CLOSE:
+					running = 0;
+					break;
+				case SDL_WINDOWEVENT_MOVED:
+				case SDL_WINDOWEVENT_ENTER:
+				case SDL_WINDOWEVENT_LEAVE:
+				case SDL_WINDOWEVENT_FOCUS_GAINED:
+				case SDL_WINDOWEVENT_FOCUS_LOST:
+#if (SDL_MAJOR_VERSION > 2) || (SDL_MAJOR_VERSION == 2 && \
+    (SDL_MINOR_VERSION > 0) || (SDL_PATCHLEVEL > 4))
+				case SDL_WINDOWEVENT_TAKE_FOCUS:
+#endif
+					break;
+				}
+			}
+		}
+		SDL_Delay(30);
+		draw();
+	}
 }

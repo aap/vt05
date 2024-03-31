@@ -48,7 +48,6 @@ SDL_Texture *screentex;
 const u8 *keystate;
 char fb[TERMHEIGHT][TERMWIDTH];
 int curx, cury;
-u32 userevent;
 int updatebuf = 1;
 int updatescreen = 1;
 int rerun = 0;
@@ -312,15 +311,12 @@ void*
 timethread(void *arg)
 {
 	(void)arg;
-	SDL_Event ev;
-	memset(&ev, 0, sizeof(ev));
-	ev.type = userevent;
+
 	struct timespec slp = { 0, 1000*1000*1000/3.75f };
 	for(;;){
 		blink = !blink;
 		updatebuf = 1;
 		nanosleep(&slp, nil);
-		SDL_PushEvent(&ev);
 	}
 }
 
@@ -338,7 +334,6 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	SDL_Event ev;
 	int x, y;
 	pthread_t thr1, thr2;
 	struct winsize ws;
@@ -382,8 +377,6 @@ main(int argc, char *argv[])
 
 	keystate = SDL_GetKeyboardState(nil);
 
-	userevent = SDL_RegisterEvents(1);
-
 	for(x = 0; x < TERMWIDTH; x++)
 		for(y = 0; y < TERMHEIGHT; y++)
 			fb[y][x] = ' ';
@@ -391,50 +384,14 @@ main(int argc, char *argv[])
 	initblur(1.3);
 	createfont();
 
-	pthread_create(&thr1, NULL, readthread, NULL);
+	pthread_create(&thr1, nil, readthread, nil);
 	pthread_create(&thr2, nil, timethread, nil);
 
 	if(full)
 		toggle_fullscreen();
 
-	while(SDL_WaitEvent(&ev) >= 0){
-		switch(ev.type){
-		case SDL_QUIT:
-			goto out;
+	mainloop();
 
-		case SDL_KEYDOWN:
-			keydown(ev.key.keysym, ev.key.repeat);
-			break;
-		case SDL_KEYUP:
-			keyup(ev.key.keysym);
-			break;
-
-		case SDL_USEREVENT:
-			/* got a new character */
-			draw();
-			break;
-		case SDL_WINDOWEVENT:
-			switch(ev.window.event){
-			case SDL_WINDOWEVENT_MOVED:
-			case SDL_WINDOWEVENT_ENTER:
-			case SDL_WINDOWEVENT_LEAVE:
-			case SDL_WINDOWEVENT_FOCUS_GAINED:
-			case SDL_WINDOWEVENT_FOCUS_LOST:
-#if (SDL_MAJOR_VERSION > 2) || (SDL_MAJOR_VERSION == 2 && \
-    (SDL_MINOR_VERSION > 0) || (SDL_PATCHLEVEL > 4))
-			case SDL_WINDOWEVENT_TAKE_FOCUS:
-#endif
-				break;
-			default:
-				/* redraw */
-				updatescreen = 1;
-				draw();
-				break;
-			}
-			break;
-		}
-	}
-out:
 	SDL_Quit();
 	return 0;
 }
