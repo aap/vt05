@@ -13,3 +13,6 @@ gecon: gecon.c terminal.c dpchars.h args.h
 	cc $(WARN) -O3 -o $@ gecon.c terminal.c $(DEPS)
 dm2500: dm2500.c terminal.c dmchars.h args.h
 	cc $(WARN) -O3 -o dm2500 dm2500.c terminal.c $(DEPS)
+clean:
+	rm -f vt05 vt52 vt50 dp3300 gecon dm2500
+
