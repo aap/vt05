@@ -363,7 +363,7 @@ main(int argc, char *argv[])
 	mkpty(&ws, TERMHEIGHT, TERMWIDTH, FBWIDTH, FBHEIGHT);
 	spawn();
 
-	mkwindow(&window, &renderer, "Datamedial Elite 2500", WIDTH*scale, HEIGHT*scale);
+	mkwindow(&window, &renderer, "Datamedia Elite 2500", WIDTH*scale, HEIGHT*scale);
 
 	screentex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 			SDL_TEXTUREACCESS_TARGET, WIDTH, HEIGHT);
